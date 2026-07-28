@@ -51,7 +51,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
 /**
- * ===== 生活工具专区：枢纽 + 待办/步数/密码/笔记/纪念日/天气/设置 =====
+ * ===== 生活工具专区：枢纽 + 待办/密码/笔记/纪念日/设置 =====
  */
 
 // ——— 工具枢纽 ———

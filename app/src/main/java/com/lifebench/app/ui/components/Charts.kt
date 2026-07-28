@@ -45,7 +45,7 @@ fun PieChart(
     }
 }
 
-/** 柱状图：用于周步数、周收支等。 */
+/** 柱状图：用于周收支等。 */
 @Composable
 fun BarChart(
     items: List<Pair<String, Double>>,

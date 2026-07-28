@@ -6,7 +6,7 @@ import com.lifebench.app.data.entity.SleepEntity
 import kotlin.math.roundToInt
 
 /**
- * 业务计算工具：睡眠时长展示、步数热量、睡眠建议、舒尔特效率分、7 天健身计划生成。
+ * 业务计算工具：睡眠时长展示、睡眠建议、舒尔特效率分、7 天健身计划生成。
  * 全部为纯函数，无副作用，便于单元测试与页面复用。
  */
 object CalcUtil {
@@ -17,9 +17,6 @@ object CalcUtil {
         val m = min % 60
         return "${h}h${m}m"
     }
-
-    /** 步数消耗热量估算（约 0.04 kcal/步，常见中等步幅经验值）。 */
-    fun stepCalories(steps: Int): Int = (steps * 0.04).roundToInt()
 
     /**
      * 睡眠改善建议：根据近一周平均时长与规律性给出可执行建议。

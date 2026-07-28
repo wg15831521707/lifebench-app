@@ -33,7 +33,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * 首页数据仪表盘：聚合今日专注、睡眠概况、本周收支、运动步数、精简天气，并提供快捷入口。
+ * 首页数据仪表盘：聚合今日专注、睡眠概况、本周收支，并提供快捷入口。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
