@@ -172,12 +172,12 @@ fun FocusScreen(nav: NavController) {
             showSetting = false
         }) { Text("确定") } }, title = { Text("番茄钟设置") }, text = {
             Column {
-                Text("单次专注（分）")
-                OutlinedTextField(focusMin.toString(), { it.toIntOrNull()?.let { v -> focusMin = v.coerceIn(1, 120) } }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                Text("休息（分）")
-                OutlinedTextField(breakMin.toString(), { it.toIntOrNull()?.let { v -> breakMin = v.coerceIn(1, 60) } }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                Text("循环轮数")
-                OutlinedTextField(totalCycles.toString(), { it.toIntOrNull()?.let { v -> totalCycles = v.coerceIn(1, 20) } }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Text("单次专注：${focusMin} 分", style = MaterialTheme.typography.bodyLarge)
+                Slider(focusMin.toFloat(), { focusMin = it.toInt().coerceIn(1, 120) }, valueRange = 1f..120f, steps = 119)
+                Text("休息：${breakMin} 分", style = MaterialTheme.typography.bodyLarge)
+                Slider(breakMin.toFloat(), { breakMin = it.toInt().coerceIn(1, 60) }, valueRange = 1f..60f, steps = 59)
+                Text("循环轮数：${totalCycles} 轮", style = MaterialTheme.typography.bodyLarge)
+                Slider(totalCycles.toFloat(), { totalCycles = it.toInt().coerceIn(1, 20) }, valueRange = 1f..20f, steps = 19)
             }
         })
     }
@@ -352,7 +352,9 @@ private fun AccountAddDialog(onDismiss: () -> Unit, onSave: (Int, String, Double
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(System.currentTimeMillis()) }
+    var newCat by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     AlertDialog(onDismissRequest = onDismiss, confirmButton = { TextButton(onClick = {
         val amt = amount.toDoubleOrNull() ?: return@TextButton
         if (cat.isBlank()) return@TextButton
@@ -363,7 +365,23 @@ private fun AccountAddDialog(onDismiss: () -> Unit, onSave: (Int, String, Double
             Column {
                 Row { listOf("支出" to 0, "收入" to 1).forEach { (t, v) -> FilterChip(selected = type == v, onClick = { type = v; cat = if (v == 0) "餐饮" else "工资" }, label = { Text(t) }, modifier = Modifier.padding(end = 4.dp)) } }
                 Spacer(Modifier.height(Dimen.s8))
-                Text("分类"); Row { (if (type == 0) listOf("餐饮", "交通", "购物", "居住", "娱乐", "医疗") else listOf("工资", "理财", "红包", "其他")).forEach { c -> FilterChip(selected = cat == c, onClick = { cat = c }, label = { Text(c) }, modifier = Modifier.padding(end = 4.dp)) } }
+                Text("分类")
+                val customCats by Repo.settings.customCategories.collectAsStateWithLifecycle(emptyList())
+                val expenseCats = listOf("餐饮", "交通", "购物", "居住", "娱乐", "医疗") + customCats
+                val incomeCats = listOf("工资", "理财", "红包", "其他") + customCats
+                FlowRow(Modifier.fillMaxWidth()) {
+                    (if (type == 0) expenseCats else incomeCats).forEach { c ->
+                        FilterChip(selected = cat == c, onClick = { cat = c }, label = { Text(c) }, modifier = Modifier.padding(end = 4.dp, bottom = 4.dp))
+                    }
+                }
+                Spacer(Modifier.height(Dimen.s4))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(newCat, { newCat = it }, modifier = Modifier.weight(1f), singleLine = true, label = { Text("自定义分类") })
+                    IconButton(onClick = {
+                        val n = newCat.trim()
+                        if (n.isNotBlank()) { scope.launch { Repo.settings.addCustomCategory(n) }; newCat = "" }
+                    }) { Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.primary) }
+                }
                 Spacer(Modifier.height(Dimen.s8))
                 OutlinedTextField(amount, { amount = it }, label = { Text("金额") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 OutlinedTextField(note, { note = it }, label = { Text("备注") }, modifier = Modifier.fillMaxWidth())

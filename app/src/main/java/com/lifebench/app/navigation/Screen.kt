@@ -14,11 +14,9 @@ object Routes {
 
     // —— 生活工具子页 ——
     const val TODO = "todo"
-    const val STEPS = "steps"
     const val PASSWORD = "password"
     const val NOTE = "note"
     const val ANNIVERSARY = "anniversary"
-    const val WEATHER = "weather"
     const val SETTINGS = "settings"
 
     // —— 健身饮食子页 ——
@@ -28,8 +26,7 @@ object Routes {
     const val DIET = "diet"
     const val FITNESS = "fitness"
 
-    // —— 脑力与速读 ——
+    // —— 脑力训练 ——
     const val SCHULTE = "schulte"                 // 舒尔特方格
-    const val SPEED_READ = "speed_read"           // 速读训练
     const val BRAIN_TRAIN = "brain_train/{category}" // 通用脑力训练，带分类参数（专注力/记忆力/逻辑）
 }

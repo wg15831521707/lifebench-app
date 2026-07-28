@@ -15,11 +15,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.lifebench.app.data.Repo
 import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.*
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.util.BackupUtil
+import com.lifebench.app.util.TimeUtil
 import kotlinx.coroutines.launch
 
 /**
@@ -29,15 +32,24 @@ import kotlinx.coroutines.launch
 fun ProfileScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) scope.launch {
+            val ok = BackupUtil.exportToUri(context, uri)
+            Toast.makeText(context, if (ok) "已导出备份到所选位置" else "导出失败", Toast.LENGTH_LONG).show()
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val ok = BackupUtil.importFromUri(context, uri)
+            Toast.makeText(context, if (ok) "恢复成功" else "恢复失败", Toast.LENGTH_LONG).show()
+        }
+    }
     val todos by Repo.todo.observeActive().collectAsStateWithLifecycle(emptyList())
     val accounts by Repo.account.observeAll().collectAsStateWithLifecycle(emptyList())
     val notes by Repo.note.observeAll().collectAsStateWithLifecycle(emptyList())
     val focuses by Repo.focus.observeAll().collectAsStateWithLifecycle(emptyList())
-    val steps by Repo.step.observeWeek().collectAsStateWithLifecycle(emptyList())
     val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
     val fontScale by Repo.settings.fontScale.collectAsStateWithLifecycle(1.0f)
-
-    val totalSteps = steps.sumOf { it.steps }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("个人中心")
@@ -51,7 +63,6 @@ fun ProfileScreen(nav: NavController) {
                 Stat("记账", "${accounts.size}")
                 Stat("笔记", "${notes.size}")
                 Stat("专注", "${focuses.size}次")
-                Stat("步数", "$totalSteps")
             }
         }
         Spacer(Modifier.height(Dimen.s12))
@@ -70,35 +81,24 @@ fun ProfileScreen(nav: NavController) {
             Text("数据备份与恢复", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
             PrimaryButton("导出全部备份", onClick = {
-                scope.launch {
-                    val p = BackupUtil.exportAll(context)
-                    Toast.makeText(context, "已导出：$p", Toast.LENGTH_LONG).show()
-                }
+                exportLauncher.launch("lifebench_backup_${TimeUtil.dayKey()}.json")
             }, icon = Icons.Filled.FileDownload)
             Spacer(Modifier.height(Dimen.s8))
             PrimaryButton("导入备份恢复", onClick = {
-                scope.launch {
-                    val files = context.filesDir.listFiles()
-                    val latest = files?.filter { it.name.endsWith(".json") }
-                        ?.sortedByDescending { it.lastModified() }?.firstOrNull()
-                    if (latest != null) {
-                        val r = BackupUtil.importAll(context, latest)
-                        Toast.makeText(context, if (r) "恢复成功" else "恢复失败", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "未找到备份文件", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                importLauncher.launch(arrayOf("application/json", "application/octet-stream"))
             }, icon = Icons.Filled.FileUpload)
+            Spacer(Modifier.height(Dimen.s4))
+            Text("导出/导入均可自选保存位置（系统文件选择器）", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Dimen.s12))
         // 关于
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("关于", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
-            Text("LifeBench 个人全能生活工作台 v1.0", fontWeight = FontWeight.SemiBold)
+            Text("LifeBench 个人全能生活工作台 v1.1", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(Dimen.s4))
             Text("离线优先 · 无广告 · 数据本地加密存储", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("含番茄钟、天气、睡眠、记账、饮食、健身、舒尔特、速读等模块，全部数据仅存于本机。",
+            Text("含番茄钟、睡眠、记账、饮食、健身、舒尔特、脑力训练等模块，全部数据仅存于本机。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Dimen.s24))

@@ -42,7 +42,6 @@ import kotlin.random.Random
 fun BrainHubScreen(nav: NavController) {
     val entries = listOf(
         BrainEntry("舒尔特方格", Icons.Filled.GridView, Routes.SCHULTE),
-        BrainEntry("速读训练", Icons.Filled.Speed, Routes.SPEED_READ),
         BrainEntry("专注力训练", Icons.Filled.Visibility, "brain_train/专注力"),
         BrainEntry("记忆力训练", Icons.Filled.Memory, "brain_train/记忆力"),
         BrainEntry("逻辑思维", Icons.Filled.Extension, "brain_train/逻辑"),
@@ -80,6 +79,7 @@ fun SchulteScreen(nav: NavController) {
     var startTime by remember { mutableStateOf(0L) }
     var elapsed by remember { mutableStateOf(0L) }
     var finished by remember { mutableStateOf<SchulteResultEntity?>(null) }
+    var lastClicked by remember { mutableStateOf(-1) }
     val history by Repo.schulte.observeAll().collectAsStateWithLifecycle(emptyList())
 
     /** 重置本局：重新洗牌、归零计时与计数。 */
@@ -91,6 +91,7 @@ fun SchulteScreen(nav: NavController) {
         startTime = 0L
         elapsed = 0L
         finished = null
+        lastClicked = -1
     }
 
     // 计时循环：running 期间每 100ms 刷新用时；暂停/结束即停。
@@ -118,6 +119,7 @@ fun SchulteScreen(nav: NavController) {
     fun onCell(v: Int) {
         if (!running) return
         if (v == expected) {
+            lastClicked = v
             expected++
             if (expected > size * size) finish()
         } else {
@@ -154,22 +156,26 @@ fun SchulteScreen(nav: NavController) {
         }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(size),
-                modifier = Modifier.fillMaxWidth().height((size * 56).dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                items(numbers) { v ->
-                    val isNext = v == expected
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (isNext && running) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.fillMaxSize().clickable { onCell(v) }
-                    ) {
-                        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                            Text("$v", style = MaterialTheme.typography.titleLarge,
-                                color = if (isNext && running) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val gap = 4.dp
+                val cell = (maxWidth - gap * (size - 1)) / size
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(size),
+                    modifier = Modifier.fillMaxWidth().height(cell * size + gap * (size - 1)),
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                ) {
+                    items(numbers) { v ->
+                        val isClicked = v == lastClicked
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (isClicked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(cell).clickable { onCell(v) }
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("$v", style = MaterialTheme.typography.titleLarge,
+                                    color = if (isClicked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
                         }
                     }
                 }
@@ -340,100 +346,3 @@ private fun LogicQuiz(onDone: (Float, Float) -> Unit) {
     }
 }
 
-// ——— 速读训练（RSVP 闪读 + 理解闯关）———
-@Composable
-fun SpeedReadScreen(nav: NavController) {
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val sample = "速读训练帮助你扩大视幅、减少默读、提升理解。RSVP 闪读以固定节奏逐词呈现，迫使眼睛匀速移动；" +
-            "配合理解闯关，让高速阅读真正吸收信息，而不是走马观花。"
-    val words = remember { sample.split(" ") }
-    var wpm by remember { mutableStateOf(300) }
-    var running by remember { mutableStateOf(false) }
-    var index by remember { mutableStateOf(0) }
-    var showQuiz by remember { mutableStateOf(false) }
-    var answered by remember { mutableStateOf<Boolean?>(null) }
-
-    // RSVP 闪读：以 wpm 节奏逐词推进，到末尾自动进入理解闯关。
-    LaunchedEffect(running) {
-        if (!running) return@LaunchedEffect
-        while (running && index < words.size) {
-            delay(60000L / wpm)
-            index++
-            if (index >= words.size) {
-                running = false
-                showQuiz = true
-            }
-        }
-    }
-
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AppTopBar("速读训练", showBack = true, onBack = { nav.popBackStack() })
-        Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("阅读速度：$wpm 词/分", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(Dimen.s8))
-            Slider(wpm.toFloat(), { wpm = it.toInt().coerceIn(100, 800) }, valueRange = 100f..800f)
-        }
-        Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                if (running || index > 0) {
-                    Text(words.getOrNull(index.coerceAtMost(words.size - 1)) ?: "", style = MaterialTheme.typography.displayMedium)
-                } else {
-                    Text("点击开始，逐词闪读", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        Spacer(Modifier.height(Dimen.s12))
-        Row(Modifier.padding(horizontal = Dimen.s16)) {
-            PrimaryButton(
-                if (running) "暂停" else "开始",
-                onClick = {
-                    if (running) running = false
-                    else { if (index >= words.size) index = 0; running = true }
-                },
-                modifier = Modifier.weight(1f),
-                icon = if (running) Icons.Filled.Pause else Icons.Filled.PlayArrow
-            )
-            Spacer(Modifier.width(Dimen.s8))
-            OutlinedButton(onClick = {
-                running = false; index = 0; showQuiz = false; answered = null
-            }, modifier = Modifier.weight(1f)) { Text("重置") }
-        }
-        Spacer(Modifier.height(Dimen.s12))
-        if (showQuiz) {
-            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-                Text("理解闯关：这段话主要讲的是？", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(Dimen.s8))
-                val options = listOf("速读训练的方法与作用" to true, "今天天气预报" to false, "家庭记账技巧" to false)
-                options.forEach { (t, correct) ->
-                    Button(
-                        onClick = {
-                            answered = correct
-                            scope.launch {
-                                Repo.training.insert(
-                                    TrainingResultEntity(category = "速读RSVP", wpm = wpm,
-                                        score = if (correct) 100f else 0f, accuracy = if (correct) 1f else 0f)
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (answered != null && correct) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(t, color = if (answered != null && correct) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary)
-                    }
-                }
-                if (answered != null) {
-                    Text(
-                        if (answered == true) "回答正确！🎉" else "别急，再读一遍会更清楚～",
-                        color = if (answered == true) LocalExtraColors.current.success else MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(Dimen.s24))
-    }
-}

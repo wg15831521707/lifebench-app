@@ -10,6 +10,7 @@ import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.unit.sp
@@ -33,26 +34,21 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.lifebench.app.data.Repo
-import com.lifebench.app.data.WeatherDemo
 import com.lifebench.app.data.entity.*
 import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.*
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.LocalExtraColors
+import com.lifebench.app.ui.theme.ThemePresets
 import com.lifebench.app.util.AlarmScheduler
 import com.lifebench.app.util.BackupUtil
-import com.lifebench.app.util.CalcUtil
 import com.lifebench.app.util.CryptoUtil
 import com.lifebench.app.util.TimeUtil
 import kotlinx.coroutines.launch
 import java.util.*
 
-import android.Manifest
-import android.location.LocationManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import com.lifebench.app.data.remote.WeatherData
-import com.lifebench.app.data.remote.WeatherRepository
 
 /**
  * ===== 生活工具专区：枢纽 + 待办/步数/密码/笔记/纪念日/天气/设置 =====
@@ -63,11 +59,9 @@ import com.lifebench.app.data.remote.WeatherRepository
 fun ToolsHubScreen(nav: NavController) {
     val entries = listOf(
         ToolEntry("待办备忘录", Icons.Filled.Checklist, Routes.TODO),
-        ToolEntry("每日步数", Icons.Filled.DirectionsWalk, Routes.STEPS),
         ToolEntry("密码保险箱", Icons.Filled.Lock, Routes.PASSWORD),
         ToolEntry("随手笔记", Icons.Filled.Note, Routes.NOTE),
         ToolEntry("纪念日倒计时", Icons.Filled.Celebration, Routes.ANNIVERSARY),
-        ToolEntry("天气预报", Icons.Filled.Cloud, Routes.WEATHER),
         ToolEntry("全局设置", Icons.Filled.Settings, Routes.SETTINGS),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -198,57 +192,6 @@ private fun TodoEditDialog(initial: TodoEntity?, onDismiss: () -> Unit, onSave: 
             }
         }
     )
-}
-
-// ——— 每日步数 ———
-@Composable
-fun StepsScreen(nav: NavController) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val week by Repo.step.observeWeek().collectAsStateWithLifecycle(emptyList())
-    var todaySteps by remember { mutableStateOf(0) }
-    var sensorAvailable by remember { mutableStateOf(true) }
-
-    DisposableEffect(Unit) {
-        val sm = context.getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
-        val sensor = sm?.getDefaultSensor(android.hardware.Sensor.TYPE_STEP_COUNTER)
-        val listener = object : android.hardware.SensorEventListener {
-            override fun onSensorChanged(e: android.hardware.SensorEvent?) {
-                val total = e?.values?.firstOrNull()?.toLong() ?: return
-                scope.launch {
-                    var base = Repo.settings.stepBaseline.first()
-                    if (base < 0) { base = total; Repo.settings.setStepBaseline(base) }
-                    val steps = (total - base).coerceAtLeast(0).toInt()
-                    todaySteps = steps
-                    Repo.step.upsert(StepEntity(TimeUtil.dayKey(), steps, CalcUtil.stepCalories(steps)))
-                }
-            }
-            override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
-        }
-        if (sensor != null) sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_UI)
-        else sensorAvailable = false
-        onDispose { sm?.unregisterListener(listener) }
-    }
-
-    val data = week.map { TimeUtil.formatMonthDay(it.date) to it.steps.toDouble() }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AppTopBar("每日步数", showBack = true, onBack = { nav.popBackStack() })
-        Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("今日步数", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("$todaySteps", style = MaterialTheme.typography.displayMedium)
-            Text("消耗约 ${CalcUtil.stepCalories(todaySteps)} kcal", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (!sensorAvailable) {
-            Spacer(Modifier.height(Dimen.s8))
-            Text("  本设备无计步传感器，可在设置中手动记录。", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(Dimen.s16))
-        }
-        Spacer(Modifier.height(Dimen.s16))
-        SectionTitle("本周步数")
-        Spacer(Modifier.height(Dimen.s8))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) { BarChart(data, MaterialTheme.colorScheme.primary) }
-        Spacer(Modifier.height(Dimen.s24))
-    }
 }
 
 // ——— 密码保险箱 ———
@@ -444,131 +387,6 @@ private fun AnniversaryAddDialog(onDismiss: () -> Unit, onSave: (String, Long, B
         })
 }
 
-// ——— 天气预报（真实 API：Open-Meteo，无需 Key；断网回退本地缓存/演示）———
-@Composable
-fun WeatherScreen(nav: NavController) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var input by remember { mutableStateOf("") }
-    var data by remember { mutableStateOf<WeatherData?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var source by remember { mutableStateOf("") }
-    val popular = listOf("北京", "上海", "广州", "成都", "深圳", "杭州", "武汉", "西安")
-
-    suspend fun refresh(city: String? = null, lat: Double? = null, lon: Double? = null) {
-        loading = true
-        val cached = WeatherRepository.loadCached(context)
-        if (cached != null) { data = cached; source = "离线缓存" }
-        val r = runCatching { WeatherRepository.load(context, city = city, lat = lat, lon = lon) }.getOrNull()
-        if (r != null) { data = r.data; source = r.source }
-        loading = false
-    }
-
-    val locLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (ok) {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                ?: lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-            if (loc != null) scope.launch { refresh(lat = loc.latitude, lon = loc.longitude, city = "当前位置") }
-            else scope.launch { refresh(city = popular.first()) }
-        } else scope.launch { refresh(city = popular.first()) }
-    }
-
-    LaunchedEffect(Unit) { refresh(city = popular.first()) }
-
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AppTopBar("天气预报", showBack = true, onBack = { nav.popBackStack() })
-        Spacer(Modifier.height(Dimen.s12))
-        Row(Modifier.padding(horizontal = Dimen.s16), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = input, onValueChange = { input = it },
-                label = { Text("输入城市，如 北京") },
-                singleLine = true,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(Modifier.width(Dimen.s8))
-            Button(onClick = { scope.launch { refresh(city = input.ifBlank { popular.first() }) } }) { Text("查询") }
-            IconButton(onClick = { locLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION) }) {
-                Icon(Icons.Filled.MyLocation, contentDescription = "定位")
-            }
-        }
-        Spacer(Modifier.height(Dimen.s8))
-        Row(Modifier.padding(horizontal = Dimen.s16), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            popular.forEach { c -> FilterChip(selected = false, onClick = { input = c; scope.launch { refresh(city = c) } }, label = { Text(c) }) }
-        }
-        Spacer(Modifier.height(Dimen.s8))
-        if (source.isNotEmpty()) {
-            val warn = source.contains("缓存") || source.contains("演示")
-            Row(Modifier.padding(horizontal = Dimen.s16)) {
-                AssistChip(
-                    onClick = {},
-                    label = { Text("数据来源：$source", color = if (warn) LocalExtraColors.current.warning else MaterialTheme.colorScheme.primary) },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = if (warn) LocalExtraColors.current.warning.copy(alpha = 0.12f) else MaterialTheme.colorScheme.primaryContainer
-                    )
-                )
-            }
-            Spacer(Modifier.height(Dimen.s8))
-        }
-        if (loading && data == null) {
-            Box(Modifier.fillMaxWidth().padding(Dimen.s32), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
-        data?.let { w ->
-            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(WeatherDemo.iconOf(w.now.condition), fontSize = 48.dp.value.sp)
-                    Spacer(Modifier.width(Dimen.s12))
-                    Column {
-                        Text("${w.now.temp}°", style = MaterialTheme.typography.displayMedium)
-                        Text("${w.now.city} · ${w.now.condition} · 体感${w.now.feel}°", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                Spacer(Modifier.height(Dimen.s8))
-                Text("空气质量 AQI ${w.now.aqi}（${w.now.aqiLevel}） · 紫外线 ${w.now.uv} · 湿度 ${w.now.humidity}% · ${w.now.wind}",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(Dimen.s8))
-                Row(horizontalArrangement = Arrangement.spacedBy(Dimen.s8)) {
-                    w.now.indexes.forEach { (k, v) -> AssistChip(onClick = {}, label = { Text("$k：$v") }) }
-                }
-            }
-            Spacer(Modifier.height(Dimen.s16))
-            SectionTitle("未来 7 天")
-            Spacer(Modifier.height(Dimen.s8))
-            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Dimen.s8)) {
-                    w.days.forEach { d ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            Text(d.label, style = MaterialTheme.typography.bodySmall)
-                            Text(WeatherDemo.iconOf(d.condition), fontSize = 20.dp.value.sp)
-                            Text("${d.high}°", fontWeight = FontWeight.SemiBold)
-                            Text("${d.low}°", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(Dimen.s16))
-            SectionTitle("逐小时")
-            Spacer(Modifier.height(Dimen.s8))
-            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Dimen.s12)) {
-                    w.hours.forEach { h ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(h.label, style = MaterialTheme.typography.bodySmall)
-                            Text("🌫️", fontSize = 18.dp.value.sp)
-                            Text("${h.temp}°", fontWeight = FontWeight.SemiBold)
-                            Text("${h.pop}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(h.wind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(Dimen.s24))
-        }
-    }
-}
-
 // ——— 全局设置中心 ———
 @Composable
 fun SettingsScreen(nav: NavController) {
@@ -576,22 +394,56 @@ fun SettingsScreen(nav: NavController) {
     val context = LocalContext.current
     val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
     val fontScale by Repo.settings.fontScale.collectAsStateWithLifecycle(1.0f)
+    val presetId by Repo.settings.themePreset.collectAsStateWithLifecycle("teal")
     val notify by Repo.settings.notificationEnabled.collectAsStateWithLifecycle(true)
     val sound by Repo.settings.soundEnabled.collectAsStateWithLifecycle(true)
     val budget by Repo.settings.monthlyBudget.collectAsStateWithLifecycle(2000.0)
     val lock by Repo.settings.appLockEnabled.collectAsStateWithLifecycle(false)
 
+    // 备份导出/导入：用系统文件选择器（SAF）自定义位置，不再藏在本机私有目录
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) scope.launch {
+            val ok = BackupUtil.exportToUri(context, uri)
+            Toast.makeText(context, if (ok) "已保存到你选择的位置（如 Download 文件夹）" else "导出失败", Toast.LENGTH_LONG).show()
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val ok = BackupUtil.importFromUri(context, uri)
+            Toast.makeText(context, if (ok) "恢复成功" else "恢复失败（文件格式不正确）", Toast.LENGTH_LONG).show()
+        }
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("全局设置", showBack = true, onBack = { nav.popBackStack() })
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("外观")
+            Text("外观", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
             Text("主题模式")
+            Spacer(Modifier.height(Dimen.s4))
             Row { listOf("SYSTEM" to "跟随系统","LIGHT" to "浅色","DARK" to "深色").forEach { (v, t) ->
                 FilterChip(selected = themeMode==v, onClick = { scope.launch { Repo.settings.setThemeMode(v) } }, label = { Text(t) }, modifier = Modifier.padding(end = 4.dp))
             } }
+            Spacer(Modifier.height(Dimen.s12))
+            Text("主题色彩（一键换肤，立即生效）")
             Spacer(Modifier.height(Dimen.s8))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ThemePresets.forEach { p ->
+                    val selected = presetId == p.id
+                    Column(horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { scope.launch { Repo.settings.setThemePreset(p.id) } }) {
+                        Surface(
+                            shape = CircleShape, color = p.primaryLight,
+                            modifier = Modifier.size(38.dp).then(if (selected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                        ) {}
+                        Spacer(Modifier.height(3.dp))
+                        Text(p.name, style = MaterialTheme.typography.labelSmall,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(Modifier.height(Dimen.s12))
             Text("字体大小：${"%.2f".format(fontScale)}×")
             Slider(fontScale, { scope.launch { Repo.settings.setFontScale(it) } }, valueRange = 0.85f..1.3f)
         }
@@ -619,15 +471,18 @@ fun SettingsScreen(nav: NavController) {
         }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("数据备份与权限")
+            Text("数据备份与恢复", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Dimen.s4))
+            Text("导出时由你选择保存位置，导入时由你选择备份文件，不再藏在本机私有目录。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(Dimen.s8))
-            PrimaryButton("导出全部备份", onClick = { scope.launch { val p = BackupUtil.exportAll(context); Toast.makeText(context, "已导出：$p", Toast.LENGTH_LONG).show() } }, icon = Icons.Filled.FileDownload)
+            PrimaryButton("导出全部备份（自选位置）", onClick = {
+                exportLauncher.launch("lifebench_backup_${System.currentTimeMillis()}.json")
+            }, icon = Icons.Filled.FileDownload)
             Spacer(Modifier.height(Dimen.s8))
-            PrimaryButton("导入备份恢复", onClick = { scope.launch {
-                context.filesDir.listFiles { _, n -> n.endsWith(".json") }?.sortedByDescending { it.lastModified() }?.firstOrNull()?.let { f ->
-                    val r = BackupUtil.importAll(context, f); Toast.makeText(context, if (r) "恢复成功" else "恢复失败", Toast.LENGTH_SHORT).show()
-                } ?: Toast.makeText(context, "未找到备份文件", Toast.LENGTH_SHORT).show()
-            } }, icon = Icons.Filled.FileUpload)
+            PrimaryButton("导入备份恢复（自选文件）", onClick = {
+                importLauncher.launch(arrayOf("application/json", "*/*"))
+            }, icon = Icons.Filled.FileUpload)
             Spacer(Modifier.height(Dimen.s8))
             PrimaryButton("打开系统权限设置", onClick = {
                 context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))

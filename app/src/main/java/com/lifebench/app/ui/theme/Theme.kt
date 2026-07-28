@@ -18,12 +18,13 @@ val LocalExtraColors = staticCompositionLocalOf {
     ExtraColors(SuccessLight, WarningLight, WhiteNoiseLight, OnSurfaceVariantLight)
 }
 
-private val LightColors = lightColorScheme(
-    primary = PrimaryLight,
+/** 依据预设与深浅模式构建浅色色板（中性色全局统一，仅主/次色随预设）。 */
+private fun buildLight(p: ThemePreset) = lightColorScheme(
+    primary = p.primaryLight,
     onPrimary = Color.White,
-    primaryContainer = PrimaryContainerLight,
+    primaryContainer = p.primaryContainerLight,
     onPrimaryContainer = OnSurfaceLight,
-    secondary = SecondaryLight,
+    secondary = p.secondaryLight,
     background = BackgroundLight,
     onBackground = OnSurfaceLight,
     surface = SurfaceLight,
@@ -34,12 +35,13 @@ private val LightColors = lightColorScheme(
     error = ErrorLight,
 )
 
-private val DarkColors = darkColorScheme(
-    primary = PrimaryDark,
+/** 依据预设与深浅模式构建深色色板。 */
+private fun buildDark(p: ThemePreset) = darkColorScheme(
+    primary = p.primaryDark,
     onPrimary = Color(0xFF10201F),
-    primaryContainer = PrimaryContainerDark,
+    primaryContainer = p.primaryContainerDark,
     onPrimaryContainer = OnSurfaceDark,
-    secondary = SecondaryDark,
+    secondary = p.secondaryDark,
     background = BackgroundDark,
     onBackground = OnSurfaceDark,
     surface = SurfaceDark,
@@ -51,11 +53,12 @@ private val DarkColors = darkColorScheme(
 )
 
 /**
- * 全局主题包裹：根据 themeMode 选择色板，注入字体缩放与额外色。
+ * 全局主题包裹：根据 themeMode 选择深浅，依据 preset 选择主/次色；注入字体缩放与额外色。
  * 所有页面最外层统一调用，切换即时生效且无需重启。
  */
 @Composable
 fun LifeBenchTheme(
+    preset: ThemePreset = DefaultPreset,
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     fontScale: Float = 1.0f,
     content: @Composable () -> Unit
@@ -66,7 +69,7 @@ fun LifeBenchTheme(
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
-    val colorScheme = if (dark) DarkColors else LightColors
+    val colorScheme = if (dark) buildDark(preset) else buildLight(preset)
     val extra = if (dark) {
         ExtraColors(SuccessDark, WarningDark, WhiteNoiseDark, OnSurfaceVariantDark)
     } else {

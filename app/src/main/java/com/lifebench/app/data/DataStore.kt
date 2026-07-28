@@ -20,6 +20,10 @@ class SettingsStore(private val context: Context) {
     val themeMode: Flow<String> = ds.data.map { it[KEY_THEME] ?: "SYSTEM" }
     suspend fun setThemeMode(v: String) = ds.edit { it[KEY_THEME] = v }
 
+    // —— 主题色彩预设 id（teal/blue/green/orange/pink/purple）——
+    val themePreset: Flow<String> = ds.data.map { it[KEY_PRESET] ?: "teal" }
+    suspend fun setThemePreset(v: String) = ds.edit { it[KEY_PRESET] = v }
+
     // —— 字体缩放 0.85~1.3 ——
     val fontScale: Flow<Float> = ds.data.map { it[KEY_FONT] ?: 1.0f }
     suspend fun setFontScale(v: Float) = ds.edit { it[KEY_FONT] = v.coerceIn(0.85f, 1.3f) }
@@ -35,6 +39,18 @@ class SettingsStore(private val context: Context) {
     // —— 月度消费预算（元）——
     val monthlyBudget: Flow<Double> = ds.data.map { it[KEY_BUDGET] ?: 2000.0 }
     suspend fun setMonthlyBudget(v: Double) = ds.edit { it[KEY_BUDGET] = v.coerceAtLeast(0.0) }
+
+    // —— 记账自定义分类（以 | 分隔存储）——
+    val customCategories: Flow<List<String>> = ds.data.map { (it[KEY_CUSTOM_CAT] ?: "").split("|").filter { s -> s.isNotBlank() } }
+    suspend fun addCustomCategory(v: String) = ds.edit {
+        val cur = (it[KEY_CUSTOM_CAT] ?: "").split("|").filter { s -> s.isNotBlank() }.toMutableList()
+        if (v.isNotBlank() && v !in cur) cur.add(v)
+        it[KEY_CUSTOM_CAT] = cur.joinToString("|")
+    }
+    suspend fun removeCustomCategory(v: String) = ds.edit {
+        val cur = (it[KEY_CUSTOM_CAT] ?: "").split("|").filter { s -> s.isNotBlank() && s != v }
+        it[KEY_CUSTOM_CAT] = cur.joinToString("|")
+    }
 
     // —— 计步传感器基线（首次读取的累计值）——
     val stepBaseline: Flow<Long> = ds.data.map { it[KEY_STEP_BASE] ?: -1L }
@@ -53,6 +69,8 @@ class SettingsStore(private val context: Context) {
         private val KEY_NOTIFY = booleanPreferencesKey("notification_enabled")
         private val KEY_SOUND = booleanPreferencesKey("sound_enabled")
         private val KEY_BUDGET = doublePreferencesKey("monthly_budget")
+        private val KEY_CUSTOM_CAT = stringPreferencesKey("custom_categories")
+        private val KEY_PRESET = stringPreferencesKey("theme_preset")
         private val KEY_STEP_BASE = longPreferencesKey("step_baseline")
         private val KEY_LOCK = booleanPreferencesKey("app_lock")
     }

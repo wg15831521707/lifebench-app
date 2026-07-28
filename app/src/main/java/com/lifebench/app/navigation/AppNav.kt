@@ -90,11 +90,9 @@ fun AppNav() {
 
             // —— 生活工具子页 ——
             composable(Routes.TODO, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { TodoScreen(nav) }
-            composable(Routes.STEPS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { StepsScreen(nav) }
             composable(Routes.PASSWORD, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { PasswordScreen(nav) }
             composable(Routes.NOTE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { NoteScreen(nav) }
             composable(Routes.ANNIVERSARY, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { AnniversaryScreen(nav) }
-            composable(Routes.WEATHER, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { WeatherScreen(nav) }
             composable(Routes.SETTINGS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { SettingsScreen(nav) }
 
             // —— 健身饮食子页 ——
@@ -104,9 +102,8 @@ fun AppNav() {
             composable(Routes.DIET, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { DietScreen(nav) }
             composable(Routes.FITNESS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { FitnessScreen(nav) }
 
-            // —— 脑力与速读 ——
+            // —— 脑力训练 ——
             composable(Routes.SCHULTE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { SchulteScreen(nav) }
-            composable(Routes.SPEED_READ, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { SpeedReadScreen(nav) }
             composable("brain_train/{category}", enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { back ->
                 val cat = back.arguments?.getString("category") ?: "专注力"
                 BrainTrainScreen(nav, cat)

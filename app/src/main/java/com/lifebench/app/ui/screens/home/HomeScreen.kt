@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.lifebench.app.data.Repo
-import com.lifebench.app.data.WeatherDemo
 import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.AppCard
 import com.lifebench.app.ui.components.AppTopBar
@@ -40,7 +39,6 @@ fun HomeScreen(nav: NavController) {
     var focusMin by remember { mutableStateOf(0) }
     var weekExpense by remember { mutableStateOf(0.0) }
     val recentSleep by Repo.sleep.observeRecent().collectAsStateWithLifecycle(emptyList())
-    val weekSteps by Repo.step.observeWeek().collectAsStateWithLifecycle(emptyList())
     val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
 
     val now = System.currentTimeMillis()
@@ -56,8 +54,6 @@ fun HomeScreen(nav: NavController) {
         }
     }
 
-    val weather = remember { WeatherDemo.current() }
-    val todaySteps = weekSteps.firstOrNull()?.steps ?: 0
     val lastSleep = recentSleep.firstOrNull()
     val sleepText = lastSleep?.let { "${CalcUtil.fmtSleep(it.durationMin)}" } ?: "未记录"
 
@@ -81,22 +77,6 @@ fun HomeScreen(nav: NavController) {
 
         Spacer(Modifier.height(Dimen.s12))
 
-        // 天气精简卡
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(WeatherDemo.iconOf(weather.condition), fontSize = 32.dp.value.sp)
-                Spacer(Modifier.width(Dimen.s12))
-                Column(Modifier.weight(1f)) {
-                    Text(weather.city, fontWeight = FontWeight.SemiBold)
-                    Text("${weather.temp}° ${weather.condition} · 体感${weather.feel}°",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                TextButton(onClick = { nav.navigate(Routes.WEATHER) }) { Text("详情") }
-            }
-        }
-
-        Spacer(Modifier.height(Dimen.s12))
-
         // 今日专注 + 睡眠
         Row(Modifier.padding(horizontal = Dimen.s16)) {
             AppCard(Modifier.weight(1f).padding(end = Dimen.s6)) {
@@ -113,19 +93,12 @@ fun HomeScreen(nav: NavController) {
 
         Spacer(Modifier.height(Dimen.s12))
 
-        // 本周收支 + 步数
-        Row(Modifier.padding(horizontal = Dimen.s16)) {
-            AppCard(Modifier.weight(1f).padding(end = Dimen.s6)) {
-                Text("本周支出", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("¥%.1f".format(weekExpense), style = MaterialTheme.typography.displayMedium,
-                    color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { nav.navigate(Routes.ACCOUNT) }) { Text("记账") }
-            }
-            AppCard(Modifier.weight(1f).padding(start = Dimen.s6)) {
-                Text("今日步数", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("$todaySteps", style = MaterialTheme.typography.displayMedium)
-                TextButton(onClick = { nav.navigate(Routes.STEPS) }) { Text("详情") }
-            }
+        // 本周收支
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            Text("本周支出", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("¥%.1f".format(weekExpense), style = MaterialTheme.typography.displayMedium,
+                color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = { nav.navigate(Routes.ACCOUNT) }) { Text("记账") }
         }
 
         Spacer(Modifier.height(Dimen.s16))
@@ -172,11 +145,9 @@ private val quickEntries = listOf(
     Quick("饮食", Icons.Filled.Restaurant, Routes.DIET),
     Quick("健身", Icons.Filled.FitnessCenter, Routes.FITNESS),
     Quick("舒尔特", Icons.Filled.GridView, Routes.SCHULTE),
-    Quick("速读", Icons.Filled.Speed, Routes.SPEED_READ),
     Quick("笔记", Icons.Filled.Note, Routes.NOTE),
     Quick("密码箱", Icons.Filled.Lock, Routes.PASSWORD),
     Quick("纪念日", Icons.Filled.Celebration, Routes.ANNIVERSARY),
-    Quick("步数", Icons.Filled.DirectionsWalk, Routes.STEPS),
 )
 
 // 小工具：睡眠时长展示

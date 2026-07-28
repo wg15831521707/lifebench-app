@@ -12,8 +12,8 @@ android {
         applicationId = "com.lifebench.app"
         minSdk = 26                                   // 最低兼容 Android 8.0
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildTypes {
@@ -80,9 +80,4 @@ dependencies {
 
     // ===== JSON 序列化（数据备份导出/导入）=====
     implementation("com.google.code.gson:gson:2.10.1")
-
-    // ===== 网络：真实天气 API（Open-Meteo，无需 Key）=====
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

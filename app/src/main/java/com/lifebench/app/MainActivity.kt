@@ -9,6 +9,7 @@ import com.lifebench.app.data.Repo
 import com.lifebench.app.navigation.AppNav
 import com.lifebench.app.ui.theme.LifeBenchTheme
 import com.lifebench.app.ui.theme.ThemeMode
+import com.lifebench.app.ui.theme.presetById
 
 /**
  * 应用入口 Activity：挂载 Compose 内容，从设置中心读取主题模式与字体缩放，
@@ -20,12 +21,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
             val fontScale by Repo.settings.fontScale.collectAsStateWithLifecycle(1.0f)
+            val presetId by Repo.settings.themePreset.collectAsStateWithLifecycle("teal")
             val mode = when (themeMode) {
                 "LIGHT" -> ThemeMode.LIGHT
                 "DARK" -> ThemeMode.DARK
                 else -> ThemeMode.SYSTEM
             }
-            LifeBenchTheme(themeMode = mode, fontScale = fontScale) {
+            LifeBenchTheme(preset = presetById(presetId), themeMode = mode, fontScale = fontScale) {
                 AppNav()
             }
         }

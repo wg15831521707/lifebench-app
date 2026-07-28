@@ -1,6 +1,7 @@
 package com.lifebench.app.util
 
 import android.content.Context
+import android.net.Uri
 import androidx.room.withTransaction
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -23,10 +24,10 @@ object BackupUtil {
 
     private fun listType(of: Type): Type = TypeToken.getParameterized(List::class.java, of).type
 
-    /** 导出：把 14 张表序列化为一个 JSON 文件，返回文件绝对路径。 */
-    suspend fun exportAll(context: Context): String {
+    /** 汇总全部 14 张表为一个 JSON 对象（导出/导入共用）。 */
+    private suspend fun buildBackupJson(): JSONObject {
         val db = Repo.db
-        val root = JSONObject().apply {
+        return JSONObject().apply {
             put("todo", gson.toJson(db.todoDao().observeActive().first() + db.todoDao().observeArchived().first()))
             put("account", gson.toJson(db.accountDao().observeAll().first()))
             put("sleep", gson.toJson(db.sleepDao().getAll()))
@@ -42,15 +43,31 @@ object BackupUtil {
             put("step", gson.toJson(db.stepDao().getAll()))
             put("focus", gson.toJson(db.focusSessionDao().observeAll().first()))
         }
+    }
+
+    /** 导出到用户通过系统选择器指定的 Uri（SAF），返回是否成功。 */
+    suspend fun exportToUri(context: Context, uri: Uri): Boolean {
+        return try {
+            val json = buildBackupJson().toString(2)
+            context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /** 导出：把 14 张表序列化为一个 JSON 文件，返回文件绝对路径（保留以兼容旧调用）。 */
+    suspend fun exportAll(context: Context): String {
+        val root = buildBackupJson()
         val file = File(context.filesDir, "lifebench_backup_${System.currentTimeMillis()}.json")
         file.writeText(root.toString(2))
         return file.absolutePath
     }
 
     /** 导入：清空全部表后在事务内逐条插入；成功返回 true，异常返回 false。 */
-    suspend fun importAll(context: Context, file: File): Boolean {
+    private suspend fun applyImport(root: JSONObject): Boolean {
         return try {
-            val root = JSONObject(file.readText())
             val db = Repo.db
             fun str(k: String) = root.optString(k, "[]")
             db.withTransaction {
@@ -93,6 +110,27 @@ object BackupUtil {
                     .forEach { db.focusSessionDao().insert(it) }
             }
             true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /** 从用户通过系统选择器指定的 Uri 导入（SAF），返回是否成功。 */
+    suspend fun importFromUri(context: Context, uri: Uri): Boolean {
+        return try {
+            val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: return false
+            applyImport(JSONObject(text))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    /** 导入：从本机私有目录的文件恢复（保留以兼容旧调用）。 */
+    suspend fun importAll(context: Context, file: File): Boolean {
+        return try {
+            applyImport(JSONObject(file.readText()))
         } catch (e: Exception) {
             e.printStackTrace()
             false

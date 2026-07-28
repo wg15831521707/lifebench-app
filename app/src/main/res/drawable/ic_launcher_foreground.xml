@@ -3,8 +3,9 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 白色圆底，提升前景在主题色背景上的辨识度 -->
-    <path android:fillColor="#FFFFFF" android:pathData="M54,30a24,24 0 1,0 0.01,0z" />
-    <!-- 主题色对勾，呼应“生活工作台/待办完成” -->
-    <path android:fillColor="#4F8A8B" android:pathData="M44,54 L50,60 L66,44 L70,48 L51,67 L40,56 Z" />
+    <!-- 2x2 圆角方块：表达“生活工作台 / 仪表盘”，白色在主题色背景上更醒目 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M28,20 h14 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -8,8 h-14 a8,8 0 0 1 -8,-8 v-14 a8,8 0 0 1 8,-8 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M66,20 h14 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -8,8 h-14 a8,8 0 0 1 -8,-8 v-14 a8,8 0 0 1 8,-8 z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.85" android:pathData="M28,58 h14 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -8,8 h-14 a8,8 0 0 1 -8,-8 v-14 a8,8 0 0 1 8,-8 z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.85" android:pathData="M66,58 h14 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -8,8 h-14 a8,8 0 0 1 -8,-8 v-14 a8,8 0 0 1 8,-8 z" />
 </vector>
