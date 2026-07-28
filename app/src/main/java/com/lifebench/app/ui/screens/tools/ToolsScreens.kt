@@ -3,6 +3,7 @@ package com.lifebench.app.ui.screens.tools
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.ClipboardManager
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -11,15 +12,18 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -451,6 +455,15 @@ fun WeatherScreen(nav: NavController) {
     var source by remember { mutableStateOf("") }
     val popular = listOf("北京", "上海", "广州", "成都", "深圳", "杭州", "武汉", "西安")
 
+    suspend fun refresh(city: String? = null, lat: Double? = null, lon: Double? = null) {
+        loading = true
+        val cached = WeatherRepository.loadCached(context)
+        if (cached != null) { data = cached; source = "离线缓存" }
+        val r = runCatching { WeatherRepository.load(context, city = city, lat = lat, lon = lon) }.getOrNull()
+        if (r != null) { data = r.data; source = r.source }
+        loading = false
+    }
+
     val locLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         if (ok) {
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -459,15 +472,6 @@ fun WeatherScreen(nav: NavController) {
             if (loc != null) scope.launch { refresh(lat = loc.latitude, lon = loc.longitude, city = "当前位置") }
             else scope.launch { refresh(city = popular.first()) }
         } else scope.launch { refresh(city = popular.first()) }
-    }
-
-    suspend fun refresh(city: String? = null, lat: Double? = null, lon: Double? = null) {
-        loading = true
-        val cached = WeatherRepository.loadCached(context)
-        if (cached != null) { data = cached; source = "离线缓存" }
-        val r = runCatching { WeatherRepository.load(context, city = city, lat = lat, lon = lon) }.getOrNull()
-        if (r != null) { data = r.data; source = r.source }
-        loading = false
     }
 
     LaunchedEffect(Unit) { refresh(city = popular.first()) }

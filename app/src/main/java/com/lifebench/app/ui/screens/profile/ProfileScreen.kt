@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -77,7 +78,7 @@ fun ProfileScreen(nav: NavController) {
             Spacer(Modifier.height(Dimen.s8))
             PrimaryButton("导入备份恢复", onClick = {
                 scope.launch {
-                    context.filesDir.listFiles { _, n -> n.endsWith(".json") }
+                    context.filesDir.listFiles { it.name.endsWith(".json") }
                         ?.sortedByDescending { it.lastModified() }?.firstOrNull()?.let { f ->
                             val r = BackupUtil.importAll(context, f)
                             Toast.makeText(context, if (r) "恢复成功" else "恢复失败", Toast.LENGTH_SHORT).show()

@@ -49,8 +49,8 @@ object WeatherDemo {
             now = com.lifebench.app.data.remote.WeatherNow(
                 n.city, n.temp, n.condition, n.feel, n.aqi, aqiLevel, n.uv, 60, "2 m/s", n.indexes
             ),
-            days = days(),
-            hours = hours(),
+            days = days().map { com.lifebench.app.data.remote.WeatherDay(it.label, it.condition, it.high, it.low) },
+            hours = hours().map { com.lifebench.app.data.remote.WeatherHour(it.label, it.temp, it.pop, it.wind) },
             source = "演示数据"
         )
     }

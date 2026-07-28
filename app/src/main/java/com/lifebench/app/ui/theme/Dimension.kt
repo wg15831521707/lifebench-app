@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.dp
  */
 object Dimen {
     val s4 = 4.dp
+    val s6 = 6.dp
     val s8 = 8.dp
     val s12 = 12.dp
     val s16 = 16.dp

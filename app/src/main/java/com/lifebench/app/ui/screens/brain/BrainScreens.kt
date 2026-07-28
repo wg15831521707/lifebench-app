@@ -232,7 +232,10 @@ fun BrainTrainScreen(nav: NavController, category: String) {
         val target = sequence.joinToString("")
         val correct = userInput == target
         val hit = if (correct) 1f else {
-            userInput.zip(sequence).count { it.first == it.second }.toFloat() / sequence.size
+            val ok = userInput.mapIndexed { i, c ->
+                if (i < sequence.size && c.digitToIntOrNull() == sequence[i]) 1 else 0
+            }.sum()
+            ok.toFloat() / sequence.size
         }
         accuracy = hit
         score = hit * 100f

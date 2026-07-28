@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
@@ -30,7 +31,7 @@ fun PieChart(
         val center = Offset(size.width / 2, size.height / 2)
         var start = -90f
         items.forEachIndexed { i, item ->
-            val sweep = (item.second / total) * 360f
+            val sweep = (item.second.toFloat() / total) * 360f
             drawArc(
                 color = colors.getOrElse(i) { Color.Gray },
                 startAngle = start, sweepAngle = sweep, useCenter = true,
@@ -57,7 +58,7 @@ fun BarChart(
         val gap = size.width / n
         val barW = (gap * 0.5f).coerceAtLeast(6.dp.toPx())
         items.forEachIndexed { i, item ->
-            val h = (item.second / max) * (size.height * 0.85f)
+            val h = (item.second.toFloat() / max) * (size.height * 0.85f)
             val x = gap * i + (gap - barW) / 2
             drawRoundRect(
                 color = color,
