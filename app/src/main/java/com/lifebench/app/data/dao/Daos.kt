@@ -160,3 +160,33 @@ interface FocusSessionDao {
     @Query("SELECT COUNT(*) FROM focus_session WHERE type='专注' AND interrupted=1 AND startTime BETWEEN :s AND :e")
     suspend fun interruptCountBetween(s: Long, e: Long): Int
 }
+
+@Dao
+interface HabitDao {
+    @Insert suspend fun insertHabit(e: HabitEntity): Long
+    @Update suspend fun updateHabit(e: HabitEntity)
+    @Delete suspend fun deleteHabit(e: HabitEntity)
+    @Query("SELECT * FROM habit WHERE archived=0 ORDER BY createdAt DESC")
+    fun observeActiveHabits(): Flow<List<HabitEntity>>
+    @Query("SELECT * FROM habit WHERE id=:id LIMIT 1")
+    suspend fun getHabit(id: Long): HabitEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertCheckIn(e: HabitCheckInEntity)
+    @Delete suspend fun deleteCheckIn(e: HabitCheckInEntity)
+    @Query("DELETE FROM habit_checkin WHERE habitId=:habitId")
+    suspend fun deleteCheckInsByHabit(habitId: Long)
+    @Query("SELECT * FROM habit_checkin WHERE habitId=:habitId ORDER BY date DESC")
+    fun observeCheckIns(habitId: Long): Flow<List<HabitCheckInEntity>>
+    @Query("SELECT * FROM habit_checkin")
+    fun observeAllCheckIns(): Flow<List<HabitCheckInEntity>>
+    @Query("SELECT date, COUNT(*) as cnt FROM habit_checkin GROUP BY date")
+    fun observeHeatmap(): Flow<List<DateCount>>
+    @Query("SELECT COUNT(DISTINCT date) FROM habit_checkin WHERE habitId=:habitId")
+    suspend fun distinctDays(habitId: Long): Int
+}
+
+/** 热力图按日聚合结果：date 为 dayKey，cnt 为当日打卡总次数。 */
+data class DateCount(
+    @ColumnInfo(name = "date") val date: Long,
+    @ColumnInfo(name = "cnt") val cnt: Int
+)

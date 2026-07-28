@@ -6,13 +6,13 @@ import androidx.compose.ui.graphics.Color
  * 全局语义色板（低饱和护眼，详见《UI设计规范》）。
  * 所有界面只引用语义色，不在业务代码硬编码色值，便于一键换肤。
  */
-val PrimaryLight          = Color(0xFF4F8A8B)
-val PrimaryDark           = Color(0xFF7FB5B5)
-val PrimaryContainerLight = Color(0xFFDCEDED)
-val PrimaryContainerDark  = Color(0xFF2A4142)
+val PrimaryLight          = Color(0xFF1A9C84)
+val PrimaryDark           = Color(0xFF7FD0C2)
+val PrimaryContainerLight = Color(0xFFDCF3EE)
+val PrimaryContainerDark  = Color(0xFF1F4A44)
 val SecondaryLight        = Color(0xFFE0A899)
 val SecondaryDark         = Color(0xFFD9A292)
-val BackgroundLight       = Color(0xFFF6F7F9)
+val BackgroundLight       = Color(0xFFFAF9F6)
 val BackgroundDark        = Color(0xFF121417)
 val SurfaceLight          = Color(0xFFFFFFFF)
 val SurfaceDark           = Color(0xFF1C1F24)

@@ -27,6 +27,8 @@ import com.lifebench.app.data.Repo
 import com.lifebench.app.data.entity.*
 import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.*
+import com.lifebench.app.ui.theme.ChartPalette
+import com.lifebench.app.ui.components.MetricLine
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.LocalExtraColors
 import com.lifebench.app.util.CalcUtil
@@ -127,7 +129,7 @@ fun FocusScreen(nav: NavController) {
         val progress = if (total > 0) 1f - (remaining.toFloat() / total) else 0f
         Box(Modifier.fillMaxWidth().padding(vertical = Dimen.s12), contentAlignment = Alignment.Center) {
             Box(contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(progress = progress.coerceIn(0f, 1f), strokeWidth = 12.dp, modifier = Modifier.size(220.dp),
+                CircularProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, strokeWidth = 12.dp, modifier = Modifier.size(220.dp),
                     color = if (phase == "专注") MaterialTheme.colorScheme.primary else LocalExtraColors.current.success)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(phase, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -198,6 +200,13 @@ fun SleepScreen(nav: NavController) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("睡眠作息", showBack = true, onBack = { nav.popBackStack() })
+        Spacer(Modifier.height(Dimen.s12))
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            val avgMin = if (recent.isEmpty()) 0 else recent.map { it.durationMin }.average().toInt()
+            MetricLine(icon = Icons.Filled.Bedtime, label = "近一周平均睡眠",
+                value = if (recent.isEmpty()) "暂无" else TimeUtil.formatDuration(avgMin),
+                valueColor = MaterialTheme.colorScheme.primary)
+        }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("记录昨晚睡眠", style = MaterialTheme.typography.titleMedium)
@@ -277,19 +286,17 @@ fun AccountScreen(nav: NavController) {
         Spacer(Modifier.height(Dimen.s12))
         Row(Modifier.padding(horizontal = Dimen.s16)) {
             AppCard(Modifier.weight(1f).padding(end = Dimen.s6)) {
-                Text("本月收入", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("¥%.2f".format(income), style = MaterialTheme.typography.titleLarge, color = LocalExtraColors.current.success)
+                MetricLine(icon = Icons.Filled.Paid, label = "本月收入", value = "¥%.2f".format(income), valueColor = LocalExtraColors.current.success)
             }
             AppCard(Modifier.weight(1f).padding(start = Dimen.s6)) {
-                Text("本月支出", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("¥%.2f".format(expense), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.error)
+                MetricLine(icon = Icons.Filled.CreditCard, label = "本月支出", value = "¥%.2f".format(expense), valueColor = MaterialTheme.colorScheme.error)
             }
         }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("月度预算 ¥%.0f ${if (overBudget) "· 已超支！" else ""}".format(budget),
                 color = if (overBudget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-            LinearProgressIndicator(progress = (expense / budget.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f),
+            LinearProgressIndicator(progress = { (expense / budget.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(8.dp), color = if (overBudget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
         }
         Spacer(Modifier.height(Dimen.s12))
@@ -301,7 +308,7 @@ fun AccountScreen(nav: NavController) {
             Spacer(Modifier.height(Dimen.s8))
             val cats = monthItems.filter { it.type == 0 }.groupBy { it.category }.mapValues { it.value.sumOf { a -> a.amount } }
             val pieData = cats.map { it.key to it.value }
-            val palette = listOf(Color(0xFF4F8A8B), Color(0xFFE0A899), Color(0xFF6BBF73), Color(0xFF8A7FB0), Color(0xFFE2A53B), Color(0xFFD8695F), Color(0xFF7FB5B5))
+            val palette = ChartPalette
             if (pieData.isEmpty()) Text("本月暂无支出分类数据", color = MaterialTheme.colorScheme.onSurfaceVariant)
             else if (chartType == "饼图") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -422,8 +429,7 @@ fun DietScreen(nav: NavController) {
         AppTopBar("饮食与菜谱", showBack = true, onBack = { nav.popBackStack() })
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("今日热量摄入", style = MaterialTheme.typography.titleMedium)
-            Text("$totalCal kcal", style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
+            MetricLine(icon = Icons.Filled.Restaurant, label = "今日热量摄入", value = "$totalCal kcal", valueColor = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(Dimen.s8))
             Row { listOf("早餐" to 0, "午餐" to 1, "晚餐" to 2).forEach { (t, v) ->
                 val c = meals.filter { it.mealType == v }.sumOf { it.calories }
@@ -531,6 +537,10 @@ fun FitnessScreen(nav: NavController) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("健身计划", showBack = true, onBack = { nav.popBackStack() })
+        Spacer(Modifier.height(Dimen.s12))
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            MetricLine(icon = Icons.Filled.FitnessCenter, label = "今日消耗", value = "$todayCal kcal", valueColor = LocalExtraColors.current.success)
+        }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("今日动作统计", style = MaterialTheme.typography.titleMedium)

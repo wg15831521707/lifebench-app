@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.dp
  * 统一间距令牌（4dp 基线网格）。页面边距、卡片内边距、卡片间距统一引用，避免数值散落。
  */
 object Dimen {
+    val s2 = 2.dp
     val s4 = 4.dp
     val s6 = 6.dp
     val s8 = 8.dp

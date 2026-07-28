@@ -17,9 +17,10 @@ import com.lifebench.app.data.entity.*
         TodoEntity::class, AccountEntity::class, SleepEntity::class, RecipeEntity::class,
         DietLogEntity::class, FitnessPlanEntity::class, FitnessProfileEntity::class,
         SchulteResultEntity::class, TrainingResultEntity::class, PasswordEntity::class,
-        NoteEntity::class, AnniversaryEntity::class, StepEntity::class, FocusSessionEntity::class
+        NoteEntity::class, AnniversaryEntity::class, StepEntity::class, FocusSessionEntity::class,
+        HabitEntity::class, HabitCheckInEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun anniversaryDao(): AnniversaryDao
     abstract fun stepDao(): StepDao
     abstract fun focusSessionDao(): FocusSessionDao
+    abstract fun habitDao(): HabitDao
 
     companion object {
         @Volatile
@@ -50,6 +52,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v1.0.0：新增习惯打卡模块（habit 习惯表 + habit_checkin 打卡表）。 */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `habit` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `icon` TEXT NOT NULL, `colorIndex` INTEGER NOT NULL, `archived` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `habit_checkin` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `habitId` INTEGER NOT NULL, `date` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)")
+            }
+        }
+
         /** 单例获取，确保全 App 共用同一数据库实例。 */
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -57,7 +67,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "lifebench.db"
-                ).addMigrations(MIGRATION_1_2)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = db
                 db

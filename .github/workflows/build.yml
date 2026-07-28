@@ -1,13 +1,13 @@
-# LifeBench 安卓工程 —— 云端编译 Debug APK 并发布为 Release
-# 触发：推送到 main/master 分支，或手动 workflow_dispatch
-name: Build Debug APK
+# LifeBench 安卓工程 —— 云端编译 Debug APK
+# 触发：推送到 main/master 分支（自动构建并上传产物）；或手动 workflow_dispatch（额外发布一个 GitHub Release）
+name: Build LifeBench Debug APK
 
 on:
   push:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
-# 发布 Release 需要写权限
+# 手动触发发布 Release 时需要写权限；普通推送仅用到 checkout / 上传产物（read 也够，统一写避免权限报错）
 permissions:
   contents: write
 
@@ -24,29 +24,47 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: 安装 Android SDK
+      - name: 安装并配置 Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 安装 SDK 组件并接受许可
+      - name: 接受许可并安装 SDK 组件
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
-      - name: 生成 Gradle Wrapper（仓库未带 gradle-wrapper.jar）
+      - name: 缓存 Gradle 二进制与依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle-home/gradle-8.6
+            ~/.gradle/caches
+          key: gradle-8.6-deps-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-8.6-deps-
+
+      - name: 准备 Gradle 8.6（仓库未提交 wrapper jar，直接调用 gradle 二进制）
         run: |
-          curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.6-bin.zip
-          unzip -q gradle.zip
-          ./gradle-8.6/bin/gradle wrapper --gradle-version 8.6
-          chmod +x gradlew
+          if [ ! -x ~/.gradle-home/gradle-8.6/bin/gradle ]; then
+            curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.6-bin.zip
+            mkdir -p ~/.gradle-home
+            unzip -q gradle.zip -d ~/.gradle-home
+          fi
 
       - name: 编译 Debug APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: ~/.gradle-home/gradle-8.6/bin/gradle assembleDebug --no-daemon
 
-      - name: 发布 APK 到 GitHub Release
+      - name: 上传 APK 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: lifebench-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: 发布 Release（仅手动触发）
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: lifebench-debug-${{ github.run_number }}
+          tag_name: lifebench-v1.0.0-build-${{ github.run_number }}
           name: "LifeBench v1.0.0 #${{ github.run_number }}"
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -39,6 +39,7 @@ import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.*
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.LocalExtraColors
+import com.lifebench.app.ui.theme.LocalQuadrantColors
 import com.lifebench.app.ui.theme.ThemePresets
 import com.lifebench.app.util.AlarmScheduler
 import com.lifebench.app.util.BackupUtil
@@ -63,6 +64,7 @@ fun ToolsHubScreen(nav: NavController) {
         ToolEntry("密码保险箱", Icons.Filled.Lock, Routes.PASSWORD),
         ToolEntry("随手笔记", Icons.Filled.Note, Routes.NOTE),
         ToolEntry("纪念日倒计时", Icons.Filled.Celebration, Routes.ANNIVERSARY),
+        ToolEntry("习惯打卡", Icons.Filled.Repeat, Routes.HABIT),
         ToolEntry("全局设置", Icons.Filled.Settings, Routes.SETTINGS),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -112,7 +114,7 @@ fun TodoScreen(nav: NavController) {
                     for (q in 0..3) {
                         val qs = list.filter { it.quadrant == q }
                         if (qs.isNotEmpty()) {
-                            item { SectionTitle("  ${QUADRANT_LABELS[q]}") }
+                            item { QuadrantSectionHeader(q) }
                             items(qs, key = { it.id }) { item ->
                                 TodoRow(item,
                                     onToggle = { scope.launch { Repo.todo.update(item.copy(done = it, archived = it)) } },
@@ -149,6 +151,22 @@ fun TodoScreen(nav: NavController) {
                 }
             }
         )
+    }
+}
+
+/**
+ * 待办分区标题：带对应象限语义强调色圆点，与首页「田」字格呼应，一眼定位象限。
+ */
+@Composable
+private fun QuadrantSectionHeader(q: Int) {
+    val qc = LocalQuadrantColors.current
+    val accent = when (q) {
+        0 -> qc.q1Accent; 1 -> qc.q2Accent; 2 -> qc.q3Accent; else -> qc.q4Accent
+    }
+    Row(Modifier.padding(bottom = Dimen.s4), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).background(accent, CircleShape))
+        Spacer(Modifier.width(Dimen.s8))
+        Text(QUADRANT_LABELS[q], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -246,6 +264,11 @@ fun PasswordScreen(nav: NavController) {
         floatingActionButton = { AddFloating { showAdd = true } }
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
+            item {
+                AppCard(Modifier.padding(bottom = Dimen.s12)) {
+                    MetricLine(icon = Icons.Filled.Lock, label = "密码条目", value = "${items.size} 条")
+                }
+            }
             items(items, key = { it.id }) { p ->
                 var showDel by remember { mutableStateOf(false) }
                 AppCard(Modifier.padding(bottom = Dimen.s12)) {
@@ -311,6 +334,11 @@ fun NoteScreen(nav: NavController) {
         floatingActionButton = { AddFloating { showAdd = true } }
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
+            item {
+                AppCard(Modifier.padding(bottom = Dimen.s12)) {
+                    MetricLine(icon = Icons.Filled.Note, label = "笔记数量", value = "${items.size} 篇")
+                }
+            }
             items(items, key = { it.id }) { n ->
                 AppCard(Modifier.padding(bottom = Dimen.s12), onClick = { edit = n }) {
                     Text(n.title, fontWeight = FontWeight.SemiBold)
@@ -364,6 +392,11 @@ fun AnniversaryScreen(nav: NavController) {
         floatingActionButton = { AddFloating { showAdd = true } }
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
+            item {
+                AppCard(Modifier.padding(bottom = Dimen.s12)) {
+                    MetricLine(icon = Icons.Filled.Celebration, label = "纪念日", value = "${items.size} 个", valueColor = MaterialTheme.colorScheme.primary)
+                }
+            }
             items(items, key = { it.id }) { a ->
                 val days = TimeUtil.daysUntil(a.date)
                 var showDel by remember { mutableStateOf(false) }

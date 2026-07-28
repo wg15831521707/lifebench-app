@@ -196,3 +196,28 @@ data class FocusSessionEntity(
     val interrupted: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )
+
+/**
+ * 习惯。colorIndex 指向 HabitDotPalette 色板索引；icon 用 emoji；archived 已停用。
+ * 删除习惯时由仓库层同步清理其打卡记录（避免外键级联带来的迁移复杂度）。
+ */
+@Entity(tableName = "habit")
+data class HabitEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val icon: String = "✅",
+    val colorIndex: Int = 0,         // 指向 HabitDotPalette 色板索引（0~7）
+    val archived: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * 习惯打卡。date 为当天 0 点的 dayKey(ms)；(habitId, date) 唯一，重复打卡覆盖。
+ */
+@Entity(tableName = "habit_checkin")
+data class HabitCheckInEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val habitId: Long,
+    val date: Long,                  // dayKey
+    val createdAt: Long = System.currentTimeMillis()
+)

@@ -13,9 +13,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lifebench.app.data.entity.TodoEntity
+import com.lifebench.app.ui.theme.LocalQuadrantColors
+import com.lifebench.app.ui.theme.LocalExtraColors
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.lifebench.app.data.Repo
@@ -23,7 +32,7 @@ import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.AppCard
 import com.lifebench.app.ui.components.AppTopBar
 import com.lifebench.app.ui.components.ConfirmDeleteDialog
-import com.lifebench.app.ui.components.EmptyState
+import com.lifebench.app.ui.components.MetricLine
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.ThemeMode
 import com.lifebench.app.util.CalcUtil
@@ -45,6 +54,21 @@ fun HomeScreen(nav: NavController) {
     val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
     val todos by Repo.todo.observeActive().collectAsStateWithLifecycle(emptyList())
     val archived by Repo.todo.observeArchived().collectAsStateWithLifecycle(emptyList())
+    val habits by Repo.habit.observeActiveHabits().collectAsStateWithLifecycle(emptyList())
+    val allCheckIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
+    val todayKey = TimeUtil.dayKey()
+    val todayHabitChecked = allCheckIns.count { it.date == todayKey }
+    val byHabit = allCheckIns.groupBy { it.habitId }.mapValues { m -> m.value.map { it.date }.toSet() }
+    val longestStreak = habits.maxOfOrNull { computeStreak(byHabit[it.id] ?: emptySet()) } ?: 0
+    val streakMilestone = when {
+        longestStreak >= 365 -> 365
+        longestStreak >= 100 -> 365
+        longestStreak >= 30 -> 100
+        longestStreak >= 7 -> 30
+        else -> 7
+    }
+    val streakProgress = (longestStreak.toFloat() / streakMilestone).coerceIn(0f, 1f)
+    val streakRemain = (streakMilestone - longestStreak).coerceAtLeast(0)
 
     val now = System.currentTimeMillis()
     LaunchedEffect(Unit) {
@@ -87,67 +111,119 @@ fun HomeScreen(nav: NavController) {
         )
 
         Spacer(Modifier.height(Dimen.s12))
-        // 年份 / 日期 / 每日一语
+        // 每日一语
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("$year 年 · $weekday", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(dateStr, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(Dimen.s8))
-            Text("「${quote.first}」", fontWeight = FontWeight.SemiBold)
-            Text(quote.second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.FormatQuote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(Modifier.width(Dimen.s12))
+                Column(Modifier.weight(1f)) {
+                    Text("每日一语", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text("$year 年 · $weekday · $dateStr", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(Dimen.s12))
+            Text("「${quote.first}」", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text(quote.second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
         }
 
         Spacer(Modifier.height(Dimen.s12))
 
-        // 今日专注 + 睡眠
+        // 统计胶囊：今日专注 + 睡眠
         Row(Modifier.padding(horizontal = Dimen.s16)) {
-            AppCard(Modifier.weight(1f).padding(end = Dimen.s6)) {
-                Text("今日专注", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("${focusMin} 分", style = MaterialTheme.typography.displayMedium)
-                TextButton(onClick = { nav.navigate(Routes.FOCUS) }) { Text("开始专注") }
-            }
-            AppCard(Modifier.weight(1f).padding(start = Dimen.s6)) {
-                Text("睡眠概况", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(sleepText, style = MaterialTheme.typography.displayMedium)
-                TextButton(onClick = { nav.navigate(Routes.SLEEP) }) { Text("去记录") }
-            }
+            MetricCapsule(
+                icon = Icons.Filled.PlayArrow, label = "今日专注", value = "${focusMin} 分",
+                actionText = "开始专注", onAction = { nav.navigate(Routes.FOCUS) },
+                modifier = Modifier.weight(1f).padding(end = Dimen.s6)
+            )
+            MetricCapsule(
+                icon = Icons.Filled.Bedtime, label = "睡眠概况", value = sleepText,
+                actionText = "去记录", onAction = { nav.navigate(Routes.SLEEP) },
+                modifier = Modifier.weight(1f).padding(start = Dimen.s6)
+            )
         }
 
         Spacer(Modifier.height(Dimen.s12))
 
-        // 本周收支
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("本周支出", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("¥%.1f".format(weekExpense), style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.error)
-            TextButton(onClick = { nav.navigate(Routes.ACCOUNT) }) { Text("记账") }
+        // 本周支出
+        MetricCapsule(
+            icon = Icons.Filled.AccountBalanceWallet, label = "本周支出", value = "¥%.1f".format(weekExpense),
+            valueColor = MaterialTheme.colorScheme.error, actionText = "记账", onAction = { nav.navigate(Routes.ACCOUNT) },
+            modifier = Modifier.padding(horizontal = Dimen.s16)
+        )
+
+        // 首页习惯连续打卡入口
+        if (habits.isNotEmpty()) {
+            Spacer(Modifier.height(Dimen.s12))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("习惯打卡", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = { nav.navigate(Routes.HABIT) }) { Text("管理") }
+            }
+            Spacer(Modifier.height(Dimen.s8))
+            Row(Modifier.padding(horizontal = Dimen.s16)) {
+                MetricCapsule(
+                    icon = Icons.Filled.CheckCircle, label = "今日打卡", value = "$todayHabitChecked / ${habits.size}",
+                    valueColor = MaterialTheme.colorScheme.primary, actionText = "去打卡", onAction = { nav.navigate(Routes.HABIT) },
+                    modifier = Modifier.weight(1f).padding(end = Dimen.s6)
+                )
+                MetricCapsule(
+                    icon = Icons.Filled.Whatshot, label = "最长连续", value = "$longestStreak 天",
+                    valueColor = LocalExtraColors.current.success, actionText = "查看", onAction = { nav.navigate(Routes.HABIT) },
+                    modifier = Modifier.weight(1f).padding(start = Dimen.s6)
+                )
+            }
+            Spacer(Modifier.height(Dimen.s8))
+            // 连续天数进度条：最长连续天数向里程碑（7/30/100/365）递进
+            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Whatshot, contentDescription = null, tint = LocalExtraColors.current.success, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("连续打卡目标", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    Text("$longestStreak / $streakMilestone 天", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { streakProgress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    color = LocalExtraColors.current.success,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (longestStreak >= streakMilestone) "已达成 $streakMilestone 天连续目标！"
+                    else "再坚持 $streakRemain 天，解锁 $streakMilestone 天连续",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Spacer(Modifier.height(Dimen.s16))
-        Text("  待办四象限", style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = Dimen.s16))
-
-        Spacer(Modifier.height(Dimen.s8))
-        if (todos.isEmpty()) {
-            EmptyState("暂无进行中的待办，点下方「待办」添加", onAction = { nav.navigate(Routes.TODO) })
-        } else {
-            for (q in 0..3) {
-                val qs = todos.filter { it.quadrant == q }
-                if (qs.isNotEmpty()) {
-                    Text("  ${QUADRANT_LABELS[q]}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = Dimen.s16))
-                    qs.forEach { t ->
-                        AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8)) {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = false, onCheckedChange = { scope.launch { Repo.todo.update(t.copy(done = true, archived = true)) } })
-                                Column(Modifier.weight(1f).clickable { nav.navigate(Routes.TODO) }) {
-                                    Text(t.title, fontWeight = FontWeight.SemiBold)
-                                    if (t.dueTime != null) Text("到期 ${TimeUtil.formatHM(t.dueTime)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        // 待办四象限「田」字格
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("待办四象限", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            TextButton(onClick = { nav.navigate(Routes.TODO) }) { Text("管理") }
         }
+        Spacer(Modifier.height(Dimen.s8))
+        TodoQuadrantGrid(
+            todos = todos,
+            onCellClick = { nav.navigate(Routes.TODO) },
+            onCheck = { t -> scope.launch { Repo.todo.update(t.copy(done = true, archived = true)) } }
+        )
 
         Spacer(Modifier.height(Dimen.s12))
         // 已完成列表：可删除 / 恢复未完成
@@ -204,6 +280,125 @@ fun HomeScreen(nav: NavController) {
     }
 }
 
+/**
+ * 统计胶囊：图标芯片 + 指标行 + 行动按钮，统一首页三项数据概览的视觉。
+ */
+@Composable
+private fun MetricCapsule(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    actionText: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    AppCard(modifier = modifier) {
+        MetricLine(icon = icon, label = label, value = value, valueColor = valueColor)
+        Spacer(Modifier.height(Dimen.s8))
+        TextButton(onClick = onAction, modifier = Modifier.align(Alignment.End)) { Text(actionText) }
+    }
+}
+
+/**
+ * 待办四象限「田」字格：2×2 布局、子卡间 12dp 间隔形成十字留白，
+ * 每格独立语义背景色，一眼可读「该先做什么」。
+ */
+@Composable
+private fun TodoQuadrantGrid(
+    todos: List<TodoEntity>,
+    onCellClick: () -> Unit,
+    onCheck: (TodoEntity) -> Unit
+) {
+    val q = LocalQuadrantColors.current
+    val cells = listOf(
+        QuadrantInfo(0, "紧急 · 重要", "立即处理", q.q1Bg, q.q1Accent, q.q1Text),
+        QuadrantInfo(1, "重要 · 不急", "安排时间", q.q2Bg, q.q2Accent, q.q2Text),
+        QuadrantInfo(2, "紧急 · 不重要", "可委托", q.q3Bg, q.q3Accent, q.q3Text),
+        QuadrantInfo(3, "不急 · 不重要", "尽量删减", q.q4Bg, q.q4Accent, q.q4Text),
+    )
+    Column(Modifier.fillMaxWidth().padding(horizontal = Dimen.s16)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimen.s12)) {
+            QuadrantCell(cells[0], todos, onCellClick, onCheck, Modifier.weight(1f))
+            QuadrantCell(cells[1], todos, onCellClick, onCheck, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(Dimen.s12))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimen.s12)) {
+            QuadrantCell(cells[2], todos, onCellClick, onCheck, Modifier.weight(1f))
+            QuadrantCell(cells[3], todos, onCellClick, onCheck, Modifier.weight(1f))
+        }
+    }
+}
+
+/** 单个象限子卡：语义底色 + 标题与计数 + 最多 3 条任务预览 + 行动提示。 */
+@Composable
+private fun QuadrantCell(
+    info: QuadrantInfo,
+    todos: List<TodoEntity>,
+    onCellClick: () -> Unit,
+    onCheck: (TodoEntity) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val items = todos.filter { it.quadrant == info.index }.take(3)
+    val count = todos.count { it.quadrant == info.index }
+    Surface(
+        modifier = modifier
+            .heightIn(min = 132.dp)
+            .clickable { onCellClick() },
+        shape = RoundedCornerShape(Dimen.s8),
+        color = info.bg
+    ) {
+        Column(Modifier.padding(Dimen.s12)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).background(info.accent, CircleShape))
+                Spacer(Modifier.width(6.dp))
+                Text(info.label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = info.text)
+                Spacer(Modifier.weight(1f))
+                Text("$count", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = info.text.copy(alpha = 0.7f))
+            }
+            Spacer(Modifier.height(10.dp))
+            if (items.isEmpty()) {
+                Text("暂无任务", fontSize = 12.sp, color = info.text.copy(alpha = 0.5f))
+            } else {
+                items.forEach { t ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(bottom = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = false,
+                            onCheckedChange = { onCheck(t) },
+                            modifier = Modifier.size(18.dp),
+                            colors = CheckboxDefaults.colors(uncheckedColor = info.accent, checkedColor = info.accent)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            t.title,
+                            fontSize = 12.5.sp,
+                            color = info.text,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Text(info.hint, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = info.text.copy(alpha = 0.75f))
+        }
+    }
+}
+
+/** 象限展示数据。 */
+private data class QuadrantInfo(
+    val index: Int,
+    val label: String,
+    val hint: String,
+    val bg: Color,
+    val accent: Color,
+    val text: Color
+)
+
 private data class Quick(val label: String, val icon: ImageVector, val route: String)
 private val quickEntries = listOf(
     Quick("番茄钟", Icons.Filled.Alarm, Routes.FOCUS),
@@ -224,8 +419,21 @@ private fun CalcUtil.fmtSleep(min: Int): String {
     return "${h}h${m}m"
 }
 
-// 科维四象限标签（与待办编辑一致）
-private val QUADRANT_LABELS = listOf("重要且紧急", "重要不紧急", "紧急不重要", "不重要不紧急")
+/** 计算连续打卡天数：从今天（或昨天，若今天未打卡）往前连续计数。 */
+private fun computeStreak(dates: Set<Long>): Int {
+    if (dates.isEmpty()) return 0
+    var cursor = TimeUtil.dayKey()
+    if (cursor !in dates) {
+        cursor = TimeUtil.dayKey(cursor - 86_400_000L)
+        if (cursor !in dates) return 0
+    }
+    var streak = 0
+    while (cursor in dates) {
+        streak++
+        cursor = TimeUtil.dayKey(cursor - 86_400_000L)
+    }
+    return streak
+}
 
 // 每日一语（中 + 英），按年内第几天轮换
 private val DAILY_QUOTES = listOf(

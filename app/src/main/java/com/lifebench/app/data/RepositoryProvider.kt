@@ -34,4 +34,5 @@ object Repo {
     val anniversary get() = db.anniversaryDao()
     val step get() = db.stepDao()
     val focus get() = db.focusSessionDao()
+    val habit get() = db.habitDao()
 }

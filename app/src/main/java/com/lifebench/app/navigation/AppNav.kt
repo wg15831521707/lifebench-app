@@ -96,6 +96,7 @@ fun AppNav() {
             composable(Routes.PASSWORD, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { PasswordScreen(nav) }
             composable(Routes.NOTE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { NoteScreen(nav) }
             composable(Routes.ANNIVERSARY, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { AnniversaryScreen(nav) }
+            composable(Routes.HABIT, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { HabitScreen(nav) }
             composable(Routes.SETTINGS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { SettingsScreen(nav) }
 
             // —— 健身饮食子页 ——

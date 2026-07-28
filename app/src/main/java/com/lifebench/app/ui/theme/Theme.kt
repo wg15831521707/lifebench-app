@@ -75,7 +75,11 @@ fun LifeBenchTheme(
     } else {
         ExtraColors(SuccessLight, WarningLight, WhiteNoiseLight, OnSurfaceVariantLight)
     }
-    CompositionLocalProvider(LocalExtraColors provides extra) {
+    val quadrant = if (dark) DarkQuadrantColors else LightQuadrantColors
+    CompositionLocalProvider(
+        LocalExtraColors provides extra,
+        LocalQuadrantColors provides quadrant
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = buildTypography(fontScale),

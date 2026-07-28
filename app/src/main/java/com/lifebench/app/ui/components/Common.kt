@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -101,6 +102,36 @@ fun EmptyState(text: String, onAction: (() -> Unit)? = null, actionText: String 
         if (onAction != null) {
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = onAction) { Text(actionText) }
+        }
+    }
+}
+
+/**
+ * 指标行：图标芯片 + 标签 + 大数字，用于首页统计胶囊与子页汇总卡片，保证全局一致。
+ * valueColor 默认用 onSurface，可传语义色（如收入绿、支出红）。
+ */
+@Composable
+fun MetricLine(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            shape = RoundedCornerShape(Dimen.s8),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+            }
+        }
+        Spacer(Modifier.width(Dimen.s12))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = valueColor)
         }
     }
 }

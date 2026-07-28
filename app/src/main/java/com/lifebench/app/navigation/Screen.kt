@@ -16,6 +16,7 @@ object Routes {
     const val PASSWORD = "password"
     const val NOTE = "note"
     const val ANNIVERSARY = "anniversary"
+    const val HABIT = "habit"
     const val SETTINGS = "settings"
 
     // —— 健身饮食子页 ——

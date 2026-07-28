@@ -21,8 +21,8 @@ data class ThemePreset(
 val ThemePresets = listOf(
     ThemePreset(
         id = "teal", name = "经典青",
-        primaryLight = Color(0xFF2E9E8F), primaryDark = Color(0xFF7FD0C2),
-        primaryContainerLight = Color(0xFFD2F0EA), primaryContainerDark = Color(0xFF1F4A44),
+        primaryLight = Color(0xFF1A9C84), primaryDark = Color(0xFF7FD0C2),
+        primaryContainerLight = Color(0xFFDCF3EE), primaryContainerDark = Color(0xFF1F4A44),
         secondaryLight = Color(0xFFE0917A), secondaryDark = Color(0xFFD9A292),
     ),
     ThemePreset(
