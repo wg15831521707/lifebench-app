@@ -165,7 +165,7 @@ fun HomeScreen(nav: NavController) {
                         IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
                     }
                 }
-                if (showDel) ConfirmDeleteDialog(message = "确定删除已完成的待办「${t.title}」吗？") { scope.launch { Repo.todo.delete(t) } }
+                if (showDel) ConfirmDeleteDialog(message = "确定删除已完成的待办「${t.title}」吗？", onDismiss = { showDel = false }) { scope.launch { Repo.todo.delete(t) } }
             }
         }
 

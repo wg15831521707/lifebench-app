@@ -325,7 +325,7 @@ fun AccountScreen(nav: NavController) {
                     }
                     if (a.note.isNotEmpty()) Text(a.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (showDel) ConfirmDeleteDialog(message = "确定删除这笔「${a.category}」记账记录吗？") { scope.launch { Repo.account.delete(a) } }
+                if (showDel) ConfirmDeleteDialog(message = "确定删除这笔「${a.category}」记账记录吗？", onDismiss = { showDel = false }) { scope.launch { Repo.account.delete(a) } }
             }
         }
         Spacer(Modifier.height(Dimen.s16))
@@ -446,7 +446,7 @@ fun DietScreen(nav: NavController) {
                     IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
                 }
             }
-            if (showDel) ConfirmDeleteDialog(message = "确定删除「${m.foodName}」这条饮食记录吗？") { scope.launch { Repo.diet.delete(m) } }
+            if (showDel) ConfirmDeleteDialog(message = "确定删除「${m.foodName}」这条饮食记录吗？", onDismiss = { showDel = false }) { scope.launch { Repo.diet.delete(m) } }
         }
         if (meals.isEmpty()) EmptyState("今天还没吃饭记录哦")
         Spacer(Modifier.height(Dimen.s12))
@@ -462,7 +462,7 @@ fun DietScreen(nav: NavController) {
                 }
                 Text("食材：${r.ingredients.take(40)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (showDel) ConfirmDeleteDialog(message = "确定删除菜谱「${r.name}」吗？") { scope.launch { Repo.recipe.delete(r) } }
+            if (showDel) ConfirmDeleteDialog(message = "确定删除菜谱「${r.name}」吗？", onDismiss = { showDel = false }) { scope.launch { Repo.recipe.delete(r) } }
         }
         if (recipes.isEmpty()) EmptyState("菜谱库还是空的，添加一个家常菜吧")
         Spacer(Modifier.height(Dimen.s24))
@@ -593,7 +593,7 @@ private fun FitnessItem(e: FitnessPlanEntity, onEdit: () -> Unit, onDelete: () -
             IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
         }
     }
-    if (showDel) ConfirmDeleteDialog(message = "确定删除动作「${e.actionName}」吗？") { onDelete() }
+    if (showDel) ConfirmDeleteDialog(message = "确定删除动作「${e.actionName}」吗？", onDismiss = { showDel = false }) { onDelete() }
 }
 
 @Composable

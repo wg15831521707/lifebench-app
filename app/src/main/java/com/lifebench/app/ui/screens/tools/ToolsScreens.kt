@@ -169,7 +169,7 @@ private fun TodoRow(item: TodoEntity, onToggle: (Boolean) -> Unit, onEdit: () ->
             IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
-    if (showDel) ConfirmDeleteDialog(message = "确定删除待办「${item.title}」吗？") { onDelete() }
+    if (showDel) ConfirmDeleteDialog(message = "确定删除待办「${item.title}」吗？", onDismiss = { showDel = false }) { onDelete() }
 }
 
 @Composable
@@ -263,7 +263,7 @@ fun PasswordScreen(nav: NavController) {
                         IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
                     }
                 }
-                if (showDel) ConfirmDeleteDialog(message = "确定删除密码条目「${p.title}」吗？") { scope.launch { Repo.password.delete(p) } }
+                if (showDel) ConfirmDeleteDialog(message = "确定删除密码条目「${p.title}」吗？", onDismiss = { showDel = false }) { scope.launch { Repo.password.delete(p) } }
             }
             if (items.isEmpty()) item { EmptyState("还没有密码条目，点击 + 添加") }
         }
@@ -348,7 +348,7 @@ private fun NoteEditDialog(initial: NoteEntity?, onDismiss: () -> Unit, onSave: 
             }
         }
     )
-    if (showDel) ConfirmDeleteDialog(message = "确定删除这条笔记吗？") { onDelete() }
+    if (showDel) ConfirmDeleteDialog(message = "确定删除这条笔记吗？", onDismiss = { showDel = false }) { onDelete() }
 }
 
 // ——— 纪念日倒计时 ———
@@ -381,7 +381,7 @@ fun AnniversaryScreen(nav: NavController) {
                         IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
                     }
                 }
-                if (showDel) ConfirmDeleteDialog(message = "确定删除纪念日「${a.name}」吗？") { scope.launch { Repo.anniversary.delete(a); AlarmScheduler.cancel(context, a.id.toInt()) } }
+                if (showDel) ConfirmDeleteDialog(message = "确定删除纪念日「${a.name}」吗？", onDismiss = { showDel = false }) { scope.launch { Repo.anniversary.delete(a); AlarmScheduler.cancel(context, a.id.toInt()) } }
             }
             if (items.isEmpty()) item { EmptyState("添加重要的日子，准时提醒") }
         }
