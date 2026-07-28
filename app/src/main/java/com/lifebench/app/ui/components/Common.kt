@@ -130,8 +130,8 @@ fun AddFloating(onClick: () -> Unit) {
 fun ConfirmDeleteDialog(
     message: String,
     onDismiss: () -> Unit = {},
-    onConfirm: () -> Unit,
-    title: String = "删除确认"
+    title: String = "删除确认",
+    onConfirm: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
