@@ -66,8 +66,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended") // 全套图标
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    // ===== 导航 =====
-    implementation("androidx.navigation:navigation-compose")
+    // ===== 导航 =====（navigation-compose 不在 Compose BOM 内，需显式版本，与 Compose 1.6.2 匹配）
+    implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // ===== 本地存储 =====
     implementation("androidx.room:room-runtime:2.6.1")
