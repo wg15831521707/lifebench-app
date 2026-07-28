@@ -18,11 +18,11 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.2`（`versionCode 3`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.0`（`versionCode 4`）；包名 `com.lifebench.app`。
 
 ---
 
-## 功能模块（v1.2）
+## 功能模块（v1.0）
 
 底部四大主导航：**首页 / 工具 / 健身 / 我的**。
 
@@ -43,7 +43,7 @@
 
 通用能力：浅深主题持久化、自绘图表（饼图 / 柱状 / 折线）、精确闹钟与通知（开机自恢复）、数据备份导出导入。
 
-> 历史上曾包含步数、天气（联网）、速读 RSVP 等模块，已在 v1.1 / v1.2 迭代中移除，当前代码不含这些功能。
+> 历史上曾包含步数、天气（联网）、速读 RSVP 等模块，已在早期版本迭代中移除，当前 v1.0 代码不含这些功能。
 
 ---
 

@@ -42,7 +42,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        /** v1.1 -> v1.2：todo 增加 quadrant 象限字段；fitness_plan 增加 date 字段。 */
+        /** v1.0：todo 增加 quadrant 象限字段；fitness_plan 增加 date 字段。 */
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE todo ADD COLUMN quadrant INTEGER NOT NULL DEFAULT 2")

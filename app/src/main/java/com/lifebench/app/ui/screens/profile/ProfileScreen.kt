@@ -95,7 +95,7 @@ fun ProfileScreen(nav: NavController) {
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("关于", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
-            Text("LifeBench 个人全能生活工作台 v1.2", fontWeight = FontWeight.SemiBold)
+            Text("LifeBench 个人全能生活工作台 v1.0", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(Dimen.s4))
             Text("离线优先 · 无广告 · 数据本地加密存储", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("含番茄钟、睡眠、记账、饮食、健身、舒尔特方格等模块，全部数据仅存于本机。",
