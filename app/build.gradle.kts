@@ -35,6 +35,11 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        // FlowRow 等实验性布局 API 需要显式 opt-in
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api"
+        )
     }
     buildFeatures {
         compose = true                                // 启用 Jetpack Compose
