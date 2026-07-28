@@ -1,0 +1,19 @@
+# 构建产物
+.gradle/
+build/
+**/build/
+captures/
+
+# 环境变量（含本机 SDK 路径，不入库）
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Gradle Wrapper jar（由 CI / 本机 `gradle wrapper` 生成）
+gradle/wrapper/gradle-wrapper.jar
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 原生层占位色（Compose 主要用 ui/theme/Color.kt 语义色） -->
+    <color name="primary">#4F8A8B</color>
+    <color name="primary_dark">#7FB5B5</color>
+    <color name="background_light">#F6F7F9</color>
+    <color name="surface_light">#FFFFFF</color>
+</resources>

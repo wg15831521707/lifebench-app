@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 兼容层主题：仅用于启动瞬间的窗口背景，App 实际界面由 Compose 接管 -->
+    <style name="Theme.LifeBench" parent="android:Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/background_light</item>
+    </style>
+</resources>
