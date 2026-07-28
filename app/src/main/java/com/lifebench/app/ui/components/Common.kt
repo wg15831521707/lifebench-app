@@ -129,8 +129,8 @@ fun AddFloating(onClick: () -> Unit) {
 @Composable
 fun ConfirmDeleteDialog(
     message: String,
-    onConfirm: () -> Unit,
     onDismiss: () -> Unit = {},
+    onConfirm: () -> Unit,
     title: String = "删除确认"
 ) {
     AlertDialog(

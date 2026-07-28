@@ -541,7 +541,7 @@ fun FitnessScreen(nav: NavController) {
         Spacer(Modifier.height(Dimen.s12))
         SectionTitle("  今日动作")
         Spacer(Modifier.height(Dimen.s8))
-        records.sortedByDescending { it.createdAt }.forEach { a ->
+        records.sortedByDescending { it.id }.forEach { a ->
             FitnessItem(a,
                 onEdit = { editItem = a },
                 onDelete = { scope.launch { Repo.fitnessPlan.delete(a) } },

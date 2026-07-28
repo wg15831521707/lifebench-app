@@ -122,7 +122,7 @@ object WhiteNoisePlayer {
                         chirpLen--
                     } else if (rnd.nextDouble() < 0.0008) {
                         chirpFreq = 1500 + rnd.nextDouble() * 2500
-                        chirpLen = (0.05 + rnd.nextDouble() * 0.12) * sr.toInt()
+                        chirpLen = ((0.05 + rnd.nextDouble() * 0.12) * sr.toInt()).toInt()
                         chirpMax = chirpLen
                     }
                 }
