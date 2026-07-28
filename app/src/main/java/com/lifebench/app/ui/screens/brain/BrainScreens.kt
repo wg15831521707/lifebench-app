@@ -29,7 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * ===== 舒尔特方格（v1.0 起唯一保留的训练模块）=====
+ * ===== 舒尔特方格（v1.0.0 起唯一保留的训练模块）=====
  */
 
 // ——— 舒尔特方格 ———

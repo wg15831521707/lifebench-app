@@ -12,8 +12,9 @@ android {
         applicationId = "com.lifebench.app"
         minSdk = 26                                   // 最低兼容 Android 8.0
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.0"
+        // 版本号采用语义化版本 X.Y.Z；versionCode 由 X*10000 + Y*100 + Z 推导（1.0.0 -> 10000），保证单调递增
+        versionCode = 10000
+        versionName = "1.0.0"
     }
 
     buildTypes {
