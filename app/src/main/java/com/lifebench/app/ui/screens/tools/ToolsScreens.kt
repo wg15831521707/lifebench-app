@@ -346,8 +346,8 @@ private fun NoteEditDialog(initial: NoteEntity?, onDismiss: () -> Unit, onSave: 
                 OutlinedTextField(content, { content = it }, label = { Text("内容（支持多行）") }, modifier = Modifier.fillMaxWidth().height(120.dp), maxLines = 8)
                 OutlinedTextField(cat, { cat = it }, label = { Text("分类") }, modifier = Modifier.fillMaxWidth())
             }
-        })
-    }
+        }
+    )
     if (showDel) ConfirmDeleteDialog(message = "确定删除这条笔记吗？") { onDelete() }
 }
 
