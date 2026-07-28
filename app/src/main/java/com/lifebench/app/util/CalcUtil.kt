@@ -6,7 +6,7 @@ import com.lifebench.app.data.entity.SleepEntity
 import kotlin.math.roundToInt
 
 /**
- * 业务计算工具：睡眠时长展示、睡眠建议、舒尔特效率分、7 天健身计划生成。
+ * 业务计算工具：睡眠时长展示、睡眠建议、舒尔特星级评级、7 天健身计划生成。
  * 全部为纯函数，无副作用，便于单元测试与页面复用。
  */
 object CalcUtil {
@@ -42,13 +42,19 @@ object CalcUtil {
     }
 
     /**
-     * 舒尔特效率分：基准 = (n² × 1000) / 耗时(ms)，每错一次扣 5 分，下限 0。
-     * 分数越高代表在规格内又快又准。
+     * 舒尔特方格星级评级（0~3 星）：依据该规格「最短用时」给即时、可感知的反馈，
+     * 比抽象效率分更直观。阈值（秒）：★★★ ≤ n²×0.8；★★ ≤ n²×1.4；否则 ★。
+     * 例：5×5 三星 ≤20s、二星 ≤35s。
      */
-    fun schulteEfficiency(size: Int, timeMs: Long, errors: Int): Float {
-        if (timeMs <= 0) return 0f
-        val base = (size * size * 1000.0) / timeMs
-        return (base - errors * 5.0).coerceAtLeast(0.0).toFloat()
+    fun schulteStars(size: Int, timeMs: Long): Int {
+        if (timeMs <= 0) return 0
+        val sec = timeMs / 1000.0
+        val n2 = size * size
+        return when {
+            sec <= n2 * 0.8 -> 3
+            sec <= n2 * 1.4 -> 2
+            else -> 1
+        }
     }
 
     /**

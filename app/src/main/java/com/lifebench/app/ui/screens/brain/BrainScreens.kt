@@ -46,6 +46,7 @@ fun SchulteScreen(nav: NavController) {
     var startTime by remember { mutableStateOf(0L) }
     var elapsed by remember { mutableStateOf(0L) }
     var finished by remember { mutableStateOf<SchulteResultEntity?>(null) }
+    var isNewRecord by remember { mutableStateOf(false) }
     var lastClicked by remember { mutableStateOf(-1) }
     val history by Repo.schulte.observeAll().collectAsStateWithLifecycle(emptyList())
 
@@ -72,12 +73,14 @@ fun SchulteScreen(nav: NavController) {
         }
     }
 
-    /** 本局结束：核算效率分并入库、弹报告。 */
+    /** 本局结束：记录用时与错误、比对个人最佳、入库并弹报告。 */
     fun finish() {
         if (!running) return
         running = false
-        val eff = CalcUtil.schulteEfficiency(size, elapsed, errors)
-        val r = SchulteResultEntity(size = size, timeMs = elapsed, errors = errors, efficiency = eff, mode = mode)
+        // 入库前用当前历史判断本局是否刷新该规格最短用时（efficiency 字段保留以兼容表结构，统一写 0）
+        val prevBest = history.filter { it.size == size }.minOfOrNull { it.timeMs }
+        isNewRecord = prevBest == null || elapsed < prevBest
+        val r = SchulteResultEntity(size = size, timeMs = elapsed, errors = errors, efficiency = 0f, mode = mode)
         finished = r
         scope.launch { Repo.schulte.insert(r) }
     }
@@ -148,25 +151,54 @@ fun SchulteScreen(nav: NavController) {
                 }
             }
         }
-        if (history.isNotEmpty()) {
+        // 各规格最佳成绩：记录每个规格完成的最短用时（取代原效率分趋势图），并给星级即时反馈
+        val bestBySize = history.groupBy { it.size }
+            .mapValues { (_, list) -> list.minByOrNull { it.timeMs }!! }
+            .toSortedMap()
+        if (bestBySize.isNotEmpty()) {
             Spacer(Modifier.height(Dimen.s16))
-            SectionTitle("  成绩趋势（效率分）")
+            SectionTitle("  各规格最佳成绩")
             Spacer(Modifier.height(Dimen.s8))
             AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-                val data = history.takeLast(20).reversed().map { it.efficiency }
-                LineChart(data, MaterialTheme.colorScheme.primary)
+                bestBySize.forEach { (sz, best) ->
+                    val stars = CalcUtil.schulteStars(sz, best.timeMs)
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = Dimen.s6),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("${sz}×${sz}", fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
+                        Text(
+                            "★".repeat(stars) + "☆".repeat(3 - stars),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.width(64.dp)
+                        )
+                        Text(
+                            "最佳 %.1f 秒 · 错 %d".format(best.timeMs / 1000.0, best.errors),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
         Spacer(Modifier.height(Dimen.s24))
     }
     val f = finished
     if (f != null) {
+        val best = history.filter { it.size == f.size }.minOfOrNull { it.timeMs }
+        val bestSec = best?.let { "%.1f".format(it / 1000.0) } ?: "—"
         AlertDialog(
             onDismissRequest = { finished = null },
             confirmButton = { TextButton(onClick = { finished = null }) { Text("知道了") } },
-            title = { Text("训练完成 🎉") },
+            title = { Text(if (isNewRecord) "新纪录！🏆" else "训练完成 🎉") },
             text = {
-                Text("规格：${f.size}×${f.size}\n用时：${f.timeMs / 1000} 秒\n错误：${f.errors} 次\n模式：${f.mode}\n效率分：%.1f".format(f.efficiency))
+                Text(
+                    "规格：${f.size}×${f.size}\n" +
+                    "用时：%.1f 秒\n".format(f.timeMs / 1000.0) +
+                    "错误：${f.errors} 次\n" +
+                    "模式：${f.mode}\n" +
+                    "本规格最佳：${bestSec} 秒"
+                )
             }
         )
     }

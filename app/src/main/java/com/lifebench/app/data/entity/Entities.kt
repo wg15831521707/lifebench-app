@@ -105,7 +105,8 @@ data class FitnessProfileEntity(
 )
 
 /**
- * 舒尔特方格成绩。efficiency 为效率分；size 为方格规格；mode 点错模式。
+ * 舒尔特方格成绩。size 为方格规格；mode 点错模式；timeMs 为用时。
+ * efficiency 字段为历史遗留、为兼容旧表结构保留，现已不再写入/展示（改用各规格最短用时 + 星级）。
  */
 @Entity(tableName = "schulte_result")
 data class SchulteResultEntity(

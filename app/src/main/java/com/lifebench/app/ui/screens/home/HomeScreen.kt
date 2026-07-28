@@ -90,7 +90,11 @@ fun HomeScreen(nav: NavController) {
     val year = cal.get(Calendar.YEAR)
     val weekday = SimpleDateFormat("EEEE", Locale.CHINA).format(cal.time)
     val dateStr = "${cal.get(Calendar.MONTH) + 1}月${cal.get(Calendar.DAY_OF_MONTH)}日"
-    val quote = DAILY_QUOTES[cal.get(Calendar.DAY_OF_YEAR) % DAILY_QUOTES.size]
+    // 每日一语：以「日期」为随机种子，当天稳定、跨天换新（不按天序号循环，池大小无关）
+    val daySeed = (cal.get(Calendar.YEAR) * 10000L
+            + (cal.get(Calendar.MONTH) + 1) * 100L
+            + cal.get(Calendar.DAY_OF_MONTH)).toLong()
+    val quote = DAILY_QUOTES[kotlin.random.Random(daySeed).nextInt(DAILY_QUOTES.size)]
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar(
@@ -435,7 +439,7 @@ private fun computeStreak(dates: Set<Long>): Int {
     return streak
 }
 
-// 每日一语（中 + 英），按年内第几天轮换
+// 每日一语（中 + 英），约 30 条。以日期为种子随机选取：当天稳定、跨天换新。
 private val DAILY_QUOTES = listOf(
     "今日事，今日毕。" to "Never put off till tomorrow what you can do today.",
     "千里之行，始于足下。" to "A journey of a thousand miles begins with a single step.",
@@ -447,4 +451,24 @@ private val DAILY_QUOTES = listOf(
     "每天进步一点点。" to "Improve a little bit every single day.",
     "计划你的工作，工作你的计划。" to "Plan your work and work your plan.",
     "健康是人生第一财富。" to "Health is the first wealth in life.",
+    "你怎样度过一天，就怎样度过一生。" to "How you spend your days is how you spend your life.",
+    "不积跬步，无以至千里。" to "Without accumulating small steps, one cannot reach a thousand miles.",
+    "凡是过往，皆为序章。" to "What's past is prologue.",
+    "滴水穿石，不是力量大，而是功夫深。" to "Dripping water hollows out stone, not through force but persistence.",
+    "你现在偷的懒，都会变成未来的难。" to "The laziness of today becomes the hardship of tomorrow.",
+    "掌控时间的人，掌控人生。" to "He who controls his time controls his life.",
+    "真正的平静，来自内心的秩序。" to "True calm comes from inner order.",
+    "与其抱怨黑暗，不如提灯前行。" to "Instead of complaining about the dark, carry a lantern forward.",
+    "把时间花在重要的事上。" to "Spend your time on what matters.",
+    "习惯决定性格，性格决定命运。" to "Character is destiny, shaped by habit.",
+    "不要为打翻的牛奶哭泣。" to "Don't cry over spilled milk.",
+    "做正确的事，而非容易的事。" to "Do the right thing, not the easy thing.",
+    "专注当下，是最好的修行。" to "Presence is the best practice.",
+    "慢就是快，少即是多。" to "Slow is fast; less is more.",
+    "每一次坚持，都是对懒惰的胜利。" to "Every persistence is a win over laziness.",
+    "目标清晰，路自通畅。" to "With a clear goal, the path opens.",
+    "休息，是为了走更远的路。" to "Rest is to go further.",
+    "你现在做的事，正在定义未来的你。" to "What you do now defines the future you.",
+    "勇敢的人先享受世界。" to "The brave enjoy the world first.",
+    "让优秀成为一种习惯。" to "Make excellence a habit.",
 )
