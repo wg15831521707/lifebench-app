@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 白色圆底，提升前景在主题色背景上的辨识度 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M54,30a24,24 0 1,0 0.01,0z" />
+    <!-- 主题色对勾，呼应“生活工作台/待办完成” -->
+    <path android:fillColor="#4F8A8B" android:pathData="M44,54 L50,60 L66,44 L70,48 L51,67 L40,56 Z" />
+</vector>
