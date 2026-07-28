@@ -4,12 +4,13 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lifebench.app.data.dao.*
 import com.lifebench.app.data.entity.*
 
 /**
  * 全局 Room 数据库：聚合所有本地实体，离线存储，无后端。
- * version=1；升级时通过 Migration 处理（调试期可用 fallbackToDestructiveMigration）。
  */
 @Database(
     entities = [
@@ -18,7 +19,7 @@ import com.lifebench.app.data.entity.*
         SchulteResultEntity::class, TrainingResultEntity::class, PasswordEntity::class,
         NoteEntity::class, AnniversaryEntity::class, StepEntity::class, FocusSessionEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -41,6 +42,14 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        /** v1.1 -> v1.2：todo 增加 quadrant 象限字段；fitness_plan 增加 date 字段。 */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE todo ADD COLUMN quadrant INTEGER NOT NULL DEFAULT 2")
+                db.execSQL("ALTER TABLE fitness_plan ADD COLUMN date INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         /** 单例获取，确保全 App 共用同一数据库实例。 */
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -48,7 +57,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "lifebench.db"
-                ).fallbackToDestructiveMigration() // 调试期改 schema 不崩；上线请改为 Migration
+                ).addMigrations(MIGRATION_1_2)
                     .build()
                 INSTANCE = db
                 db

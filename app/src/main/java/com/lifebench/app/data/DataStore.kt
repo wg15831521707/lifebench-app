@@ -36,6 +36,10 @@ class SettingsStore(private val context: Context) {
     val soundEnabled: Flow<Boolean> = ds.data.map { it[KEY_SOUND] ?: true }
     suspend fun setSoundEnabled(v: Boolean) = ds.edit { it[KEY_SOUND] = v }
 
+    // —— 番茄钟白噪音选择（无/雨声/森林/海浪/咖啡馆）——
+    val whiteNoise: Flow<String> = ds.data.map { it[KEY_NOISE] ?: "无" }
+    suspend fun setWhiteNoise(v: String) = ds.edit { it[KEY_NOISE] = v }
+
     // —— 月度消费预算（元）——
     val monthlyBudget: Flow<Double> = ds.data.map { it[KEY_BUDGET] ?: 2000.0 }
     suspend fun setMonthlyBudget(v: Double) = ds.edit { it[KEY_BUDGET] = v.coerceAtLeast(0.0) }
@@ -68,6 +72,7 @@ class SettingsStore(private val context: Context) {
         private val KEY_FONT = floatPreferencesKey("font_scale")
         private val KEY_NOTIFY = booleanPreferencesKey("notification_enabled")
         private val KEY_SOUND = booleanPreferencesKey("sound_enabled")
+        private val KEY_NOISE = stringPreferencesKey("white_noise")
         private val KEY_BUDGET = doublePreferencesKey("monthly_budget")
         private val KEY_CUSTOM_CAT = stringPreferencesKey("custom_categories")
         private val KEY_PRESET = stringPreferencesKey("theme_preset")

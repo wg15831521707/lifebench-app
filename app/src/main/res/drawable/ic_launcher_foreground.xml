@@ -3,9 +3,11 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 2x2 圆角方块：表达“生活工作台 / 仪表盘”，白色在主题色背景上更醒目 -->
-    <path android:fillColor="#FFFFFF" android:pathData="M28,20 h14 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -8,8 h-14 a8,8 0 0 1 -8,-8 v-14 a8,8 0 0 1 8,-8 z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M66,20 h14 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -8,8 h-14 a8,8 0 0 1 -8,-8 v-14 a8,8 0 0 1 8,-8 z" />
-    <path android:fillColor="#FFFFFF" android:fillAlpha="0.85" android:pathData="M28,58 h14 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -8,8 h-14 a8,8 0 0 1 -8,-8 v-14 a8,8 0 0 1 8,-8 z" />
-    <path android:fillColor="#FFFFFF" android:fillAlpha="0.85" android:pathData="M66,58 h14 a8,8 0 0 1 8,8 v14 a8,8 0 0 1 -8,8 h-14 a8,8 0 0 1 -8,-8 v-14 a8,8 0 0 1 8,-8 z" />
+    <!-- 圆形外环 + 对勾：表达“生活工作台 · 今日事今日毕”，白色描边在主题色背景上更精致 -->
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="7"
+          android:strokeLineCap="round" android:strokeLineJoin="round"
+          android:pathData="M54,20 A34,34 0 1,0 54,88 A34,34 0 1,0 54,20 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="10"
+          android:strokeLineCap="round" android:strokeLineJoin="round"
+          android:pathData="M39,55 L50,66 L71,41" />
 </vector>

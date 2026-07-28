@@ -13,6 +13,7 @@ data class TodoEntity(
     val note: String = "",
     val done: Boolean = false,
     val priority: Int = 1,
+    val quadrant: Int = 2,            // 科维四象限：0重要紧急 1重要不紧急 2紧急不重要 3不重要不紧急
     val dueTime: Long? = null,        // 到期时间(ms)，用于提醒
     val repeatMode: String = "永不",
     val archived: Boolean = false,
@@ -81,13 +82,14 @@ data class DietLogEntity(
 @Entity(tableName = "fitness_plan")
 data class FitnessPlanEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val dayIndex: Int,
+    val dayIndex: Int,               // 0~6 计划模板的星期站位；记录动作时为所属 dayKey 转换的索引
     val actionName: String,
     val sets: Int = 0,
     val reps: Int = 0,
     val durationMin: Int = 0,
     val calories: Int = 0,
-    val done: Boolean = false
+    val done: Boolean = false,
+    val date: Long = 0              // 0=计划模板；>0=该日实际记录的动作（dayKey）
 )
 
 /**

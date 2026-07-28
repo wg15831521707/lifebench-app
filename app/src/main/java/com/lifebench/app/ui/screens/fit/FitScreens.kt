@@ -29,10 +29,10 @@ import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.*
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.LocalExtraColors
-import com.lifebench.app.util.AlarmScheduler
 import com.lifebench.app.util.CalcUtil
 import com.lifebench.app.util.NotificationUtil
 import com.lifebench.app.util.TimeUtil
+import com.lifebench.app.util.WhiteNoisePlayer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.*
@@ -82,7 +82,8 @@ fun FocusScreen(nav: NavController) {
     var remaining by remember { mutableStateOf(focusMin * 60) }
     var running by remember { mutableStateOf(false) }
     var cyclesDone by remember { mutableStateOf(0) }
-    var noise by remember { mutableStateOf("无") }
+    val whiteNoiseSetting by Repo.settings.whiteNoise.collectAsStateWithLifecycle("无")
+    var noise by remember { mutableStateOf(whiteNoiseSetting) }
     var showSetting by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
 
@@ -116,6 +117,7 @@ fun FocusScreen(nav: NavController) {
             try { context.stopService(Intent(context, FocusService::class.java)) } catch (_: Exception) { }
         }
     }
+    DisposableEffect(Unit) { onDispose { WhiteNoisePlayer.stop() } }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("番茄钟专注", showBack = true, onBack = { nav.popBackStack() })
@@ -152,10 +154,10 @@ fun FocusScreen(nav: NavController) {
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("白噪音背景音", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
-            Row { listOf("无", "雨声", "咖啡馆", "森林").forEach { n ->
-                FilterChip(selected = noise == n, onClick = { noise = n }, label = { Text(n) }, modifier = Modifier.padding(end = 4.dp))
+            FlowRow(Modifier.fillMaxWidth()) { listOf("无", "雨声", "森林", "海浪", "咖啡馆").forEach { n ->
+                FilterChip(selected = noise == n, onClick = { noise = n; WhiteNoisePlayer.play(n); scope.launch { Repo.settings.setWhiteNoise(n) } }, label = { Text(n) }, modifier = Modifier.padding(end = 4.dp, bottom = 4.dp))
             } }
-            Text("（放入 res/raw 音频后可在源码 FocusScreen 启用播放，详见使用说明书）", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("点击即可播放 / 切换背景白噪音（离线合成，无需联网）", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
@@ -191,9 +193,6 @@ fun SleepScreen(nav: NavController) {
     val recent by Repo.sleep.observeRecent().collectAsStateWithLifecycle(emptyList())
     var sleepTs by remember { mutableStateOf(System.currentTimeMillis() - 8 * 3600_000) } // 默认昨晚 23:00
     var wakeTs by remember { mutableStateOf(System.currentTimeMillis()) }                  // 今早 07:00
-    var alarmOn by remember { mutableStateOf(false) }
-    var alarmTime by remember { mutableStateOf("07:00") }
-
     val suggestion = remember(recent) { CalcUtil.sleepSuggestion(recent) }
     val lineData = recent.reversed().map { it.durationMin.toFloat() }
 
@@ -218,29 +217,28 @@ fun SleepScreen(nav: NavController) {
             Spacer(Modifier.height(Dimen.s8))
             PrimaryButton("保存记录", onClick = {
                 scope.launch {
-                    Repo.sleep.insert(SleepEntity(date = TimeUtil.dayKey(sleepTs), sleepTime = sleepTs, wakeTime = wakeTs, durationMin = dur))
-                    Toast.makeText(context, "已保存", Toast.LENGTH_SHORT).show()
+                    Repo.sleep.upsertByDate(SleepEntity(date = TimeUtil.dayKey(sleepTs), sleepTime = sleepTs, wakeTime = wakeTs, durationMin = dur))
+                    Toast.makeText(context, "已保存（按入睡日期覆盖，不会重复记录）", Toast.LENGTH_SHORT).show()
                 }
             }, icon = Icons.Filled.Save)
         }
         Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("起床闹钟 $alarmTime", modifier = Modifier.weight(1f))
-                Switch(alarmOn, onCheckedChange = {
-                    alarmOn = it
-                    val (h, m) = alarmTime.split(":").map { it.toInt() }
-                    val cal = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, h); set(Calendar.MINUTE, m); set(Calendar.SECOND, 0); if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_MONTH,1) }
-                    if (it) AlarmScheduler.schedule(context, AlarmScheduler.Alarm(900001, cal.timeInMillis, "起床闹钟", "该起床啦，新的一天加油！"))
-                    else AlarmScheduler.cancel(context, 900001)
-                })
+        if (recent.isNotEmpty()) {
+            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+                Text("近一周睡眠记录", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(Dimen.s8))
+                recent.reversed().forEach { r ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = Dimen.s6), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("${TimeUtil.formatMonthDay(r.sleepTime)} 入睡 ${TimeUtil.formatClock(r.sleepTime)}", style = MaterialTheme.typography.bodyMedium)
+                            Text("${TimeUtil.formatMonthDay(r.wakeTime)} 起床 ${TimeUtil.formatClock(r.wakeTime)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(TimeUtil.formatDuration(r.durationMin), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
-            Button(onClick = {
-                val (h, m) = alarmTime.split(":").map { it.toInt() }
-                TimePickerDialog(context, { _, hh, mm -> alarmTime = "%02d:%02d".format(hh, mm) }, h, m, true).show()
-            }) { Text("设置时间") }
+            Spacer(Modifier.height(Dimen.s12))
         }
-        Spacer(Modifier.height(Dimen.s12))
         if (recent.isNotEmpty()) {
             AppCard(Modifier.padding(horizontal = Dimen.s16)) {
                 Text("近一周睡眠时长（分钟）", style = MaterialTheme.typography.titleMedium)
@@ -318,14 +316,16 @@ fun AccountScreen(nav: NavController) {
         Spacer(Modifier.height(Dimen.s12))
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = Dimen.s16).heightIn(max = 360.dp)) {
             items(monthItems.sortedByDescending { it.date }, key = { it.id }) { a ->
+                var showDel by remember { mutableStateOf(false) }
                 AppCard(Modifier.padding(bottom = Dimen.s8)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(a.category, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         Text((if (a.type == 1) "+" else "-") + "¥%.2f".format(a.amount), color = if (a.type == 1) LocalExtraColors.current.success else MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                        IconButton(onClick = { scope.launch { Repo.account.delete(a) } }) { Icon(Icons.Filled.Delete, null) }
+                        IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
                     }
                     if (a.note.isNotEmpty()) Text(a.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                if (showDel) ConfirmDeleteDialog(message = "确定删除这笔「${a.category}」记账记录吗？") { scope.launch { Repo.account.delete(a) } }
             }
         }
         Spacer(Modifier.height(Dimen.s16))
@@ -367,19 +367,34 @@ private fun AccountAddDialog(onDismiss: () -> Unit, onSave: (Int, String, Double
                 Spacer(Modifier.height(Dimen.s8))
                 Text("分类")
                 val customCats by Repo.settings.customCategories.collectAsStateWithLifecycle(emptyList())
-                val expenseCats = listOf("餐饮", "交通", "购物", "居住", "娱乐", "医疗") + customCats
-                val incomeCats = listOf("工资", "理财", "红包", "其他") + customCats
+                val allCats = (if (type == 0) listOf("餐饮", "交通", "购物", "居住", "娱乐", "医疗") else listOf("工资", "理财", "红包", "其他")) + customCats
                 FlowRow(Modifier.fillMaxWidth()) {
-                    (if (type == 0) expenseCats else incomeCats).forEach { c ->
+                    allCats.forEach { c ->
                         FilterChip(selected = cat == c, onClick = { cat = c }, label = { Text(c) }, modifier = Modifier.padding(end = 4.dp, bottom = 4.dp))
                     }
                 }
                 Spacer(Modifier.height(Dimen.s4))
+                if (customCats.isNotEmpty()) {
+                    Text("自定义分类（点 ✕ 可删除）", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(Modifier.fillMaxWidth()) {
+                        customCats.forEach { c ->
+                            AssistChip(
+                                onClick = { cat = c },
+                                label = { Text(c) },
+                                trailingIcon = { Icon(Icons.Filled.Close, null, modifier = Modifier.clickable { scope.launch { Repo.settings.removeCustomCategory(c) } }.size(16.dp)) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(Dimen.s4))
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(newCat, { newCat = it }, modifier = Modifier.weight(1f), singleLine = true, label = { Text("自定义分类") })
                     IconButton(onClick = {
                         val n = newCat.trim()
-                        if (n.isNotBlank()) { scope.launch { Repo.settings.addCustomCategory(n) }; newCat = "" }
+                        if (n.isNotBlank()) {
+                            if (n in allCats) Toast.makeText(context, "分类「$n」已存在", Toast.LENGTH_SHORT).show()
+                            else { scope.launch { Repo.settings.addCustomCategory(n) }; newCat = "" }
+                        }
                     }) { Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.primary) }
                 }
                 Spacer(Modifier.height(Dimen.s8))
@@ -400,6 +415,7 @@ fun DietScreen(nav: NavController) {
     val recipes by Repo.recipe.observeAll().collectAsStateWithLifecycle(emptyList())
     var showMeal by remember { mutableStateOf(false) }
     var showRecipe by remember { mutableStateOf(false) }
+    var editMeal by remember { mutableStateOf<DietLogEntity?>(null) }
 
     val totalCal = meals.sumOf { it.calories }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -419,33 +435,56 @@ fun DietScreen(nav: NavController) {
         Spacer(Modifier.height(Dimen.s12))
         SectionTitle("  今日饮食")
         Spacer(Modifier.height(Dimen.s8))
-        meals.forEach { m -> AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8)) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(m.foodName, modifier = Modifier.weight(1f)); Text("${m.calories} kcal") } } }
+        meals.forEach { m ->
+            var showDel by remember { mutableStateOf(false) }
+            AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8), onClick = { editMeal = m }) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(m.foodName, fontWeight = FontWeight.SemiBold)
+                        Text("${m.calories} kcal", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
+                }
+            }
+            if (showDel) ConfirmDeleteDialog(message = "确定删除「${m.foodName}」这条饮食记录吗？") { scope.launch { Repo.diet.delete(m) } }
+        }
         if (meals.isEmpty()) EmptyState("今天还没吃饭记录哦")
         Spacer(Modifier.height(Dimen.s12))
         SectionTitle("  我的菜谱库")
         Spacer(Modifier.height(Dimen.s8))
         recipes.forEach { r ->
+            var showDel by remember { mutableStateOf(false) }
             AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(r.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     IconButton(onClick = { scope.launch { Repo.recipe.update(r.copy(favorite = !r.favorite)) } }) { Icon(if (r.favorite) Icons.Filled.Star else Icons.Filled.StarBorder, null, tint = if (r.favorite) LocalExtraColors.current.warning else MaterialTheme.colorScheme.onSurfaceVariant) }
-                    IconButton(onClick = { scope.launch { Repo.recipe.delete(r) } }) { Icon(Icons.Filled.Delete, null) }
+                    IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
                 }
                 Text("食材：${r.ingredients.take(40)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (showDel) ConfirmDeleteDialog(message = "确定删除菜谱「${r.name}」吗？") { scope.launch { Repo.recipe.delete(r) } }
         }
         if (recipes.isEmpty()) EmptyState("菜谱库还是空的，添加一个家常菜吧")
         Spacer(Modifier.height(Dimen.s24))
     }
-    if (showMeal) MealAddDialog(onDismiss = { showMeal = false }, onSave = { mt, name, cal -> scope.launch { Repo.diet.insert(DietLogEntity(date = today, mealType = mt, foodName = name, calories = cal)); showMeal = false } })
+    val mealToEdit = editMeal
+    if (showMeal || mealToEdit != null) {
+        MealAddDialog(initial = mealToEdit, onDismiss = { showMeal = false; editMeal = null }, onSave = { mt, name, cal ->
+            scope.launch {
+                if (mealToEdit != null) Repo.diet.update(mealToEdit.copy(mealType = mt, foodName = name, calories = cal))
+                else Repo.diet.insert(DietLogEntity(date = today, mealType = mt, foodName = name, calories = cal))
+                showMeal = false; editMeal = null
+            }
+        })
+    }
     if (showRecipe) RecipeAddDialog(onDismiss = { showRecipe = false }, onSave = { name, ing, steps, fav -> scope.launch { Repo.recipe.insert(RecipeEntity(name = name, ingredients = ing, steps = steps, favorite = fav)); showRecipe = false } })
 }
 
 @Composable
-private fun MealAddDialog(onDismiss: () -> Unit, onSave: (Int, String, Int) -> Unit) {
-    var mt by remember { mutableStateOf(0) }
-    var name by remember { mutableStateOf("") }
-    var cal by remember { mutableStateOf("") }
+private fun MealAddDialog(initial: DietLogEntity? = null, onDismiss: () -> Unit, onSave: (Int, String, Int) -> Unit) {
+    var mt by remember { mutableStateOf(initial?.mealType ?: 0) }
+    var name by remember { mutableStateOf(initial?.foodName ?: "") }
+    var cal by remember { mutableStateOf((initial?.calories ?: "").toString()) }
     AlertDialog(onDismissRequest = onDismiss, confirmButton = { TextButton(onClick = { val c = cal.toIntOrNull() ?: 0; if (name.isBlank()) return@TextButton; onSave(mt, name, c) }) { Text("保存") } },
         dismissButton = { TextButton(onDismiss) { Text("取消") } }, title = { Text("打卡饮食") }, text = {
             Column {
@@ -474,72 +513,120 @@ private fun RecipeAddDialog(onDismiss: () -> Unit, onSave: (String, String, Stri
         })
 }
 
-// ——— 个性化健身计划 ———
+// ——— 健身计划：记录动作 + 运动规划 ———
 @Composable
 fun FitnessScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val plan by Repo.fitnessPlan.observeAll().collectAsStateWithLifecycle(emptyList())
-    val profile = remember { mutableStateOf<FitnessProfileEntity?>(null) }
-    var showProfile by remember { mutableStateOf(false) }
+    val today = TimeUtil.dayKey()
+    val records = plan.filter { it.date == today }
+    val templates = plan.filter { it.date == 0L }
+    var showAddRecord by remember { mutableStateOf(false) }
+    var showAddPlan by remember { mutableStateOf(false) }
+    var editItem by remember { mutableStateOf<FitnessPlanEntity?>(null) }
 
-    LaunchedEffect(Unit) { profile.value = Repo.fitnessProfile.get() }
-
-    val todayStats = plan.filter { it.dayIndex == Calendar.getInstance().get(Calendar.DAY_OF_WEEK) % 7 }.let { p -> p.sumOf { it.calories } to p.sumOf { it.durationMin } }
+    val todayCal = records.sumOf { it.calories }
+    val todayDur = records.sumOf { it.durationMin }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("健身计划", showBack = true, onBack = { nav.popBackStack() })
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("今日训练统计", style = MaterialTheme.typography.titleMedium)
-            Text("时长 ${todayStats.second} 分 · 消耗 ${todayStats.first} kcal", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+            Text("今日动作统计", style = MaterialTheme.typography.titleMedium)
+            Text("动作 ${records.size} 个 · 时长 ${todayDur} 分 · 消耗 ${todayCal} kcal", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(Dimen.s8))
-            PrimaryButton(if (profile.value == null) "填写资料生成计划" else "重新生成 7 天计划", onClick = { showProfile = true }, icon = Icons.Filled.Refresh)
+            PrimaryButton("＋ 记录今日动作", onClick = { showAddRecord = true }, icon = Icons.Filled.Add)
         }
         Spacer(Modifier.height(Dimen.s12))
-        plan.groupBy { it.dayIndex }.toSortedMap().forEach { (day, items) ->
-            AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s12)) {
-                Text("第 ${day + 1} 天${if (day == 6) "（恢复日）" else ""}", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(Dimen.s8))
-                items.forEach { a ->
-                    Row(Modifier.fillMaxWidth().clickable { scope.launch { Repo.fitnessPlan.update(a.copy(done = !a.done)) } }, verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = a.done, onCheckedChange = { scope.launch { Repo.fitnessPlan.update(a.copy(done = it)) } })
-                        Text(a.actionName, modifier = Modifier.weight(1f))
-                        Text(if (a.reps > 0) "${a.sets}组×${a.reps}次" else "${a.durationMin}分", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+        SectionTitle("  今日动作")
+        Spacer(Modifier.height(Dimen.s8))
+        records.sortedByDescending { it.createdAt }.forEach { a ->
+            FitnessItem(a,
+                onEdit = { editItem = a },
+                onDelete = { scope.launch { Repo.fitnessPlan.delete(a) } },
+                onToggle = { scope.launch { Repo.fitnessPlan.update(a.copy(done = it)) } })
+        }
+        if (records.isEmpty()) EmptyState("今天还没记录动作，点击上方按钮打卡")
+        Spacer(Modifier.height(Dimen.s12))
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("健身计划（模板）", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                TextButton(onClick = { showAddPlan = true }) { Text("＋ 添加") }
             }
         }
-        if (plan.isEmpty()) EmptyState("生成计划后这里会显示 7 天训练安排")
+        Spacer(Modifier.height(Dimen.s8))
+        templates.forEach { a ->
+            FitnessItem(a,
+                onEdit = { editItem = a },
+                onDelete = { scope.launch { Repo.fitnessPlan.delete(a) } },
+                onToggle = { scope.launch { Repo.fitnessPlan.update(a.copy(done = it)) } })
+        }
+        if (templates.isEmpty()) EmptyState("还没有健身计划，添加你想练的动作吧")
         Spacer(Modifier.height(Dimen.s24))
     }
-    if (showProfile) ProfileDialog(onDismiss = { showProfile = false }, initial = profile.value, onSave = { p ->
-        scope.launch {
-            Repo.fitnessPlan.clear()
-            Repo.fitnessProfile.upsert(p)
-            CalcUtil.generateFitnessPlan(p).forEach { Repo.fitnessPlan.insert(it) }
-            profile.value = p
-            showProfile = false
-            Toast.makeText(context, "已生成 7 天计划", Toast.LENGTH_SHORT).show()
-        }
+
+    val edit = editItem
+    if (showAddRecord) AddFitnessDialog(onDismiss = { showAddRecord = false }, onSave = { name, sets, reps, dur, cal ->
+        scope.launch { Repo.fitnessPlan.insert(FitnessPlanEntity(dayIndex = Calendar.getInstance().get(Calendar.DAY_OF_WEEK), actionName = name, sets = sets, reps = reps, durationMin = dur, calories = cal, date = today)); showAddRecord = false }
+    })
+    if (showAddPlan) AddFitnessDialog(onDismiss = { showAddPlan = false }, onSave = { name, sets, reps, dur, cal ->
+        scope.launch { Repo.fitnessPlan.insert(FitnessPlanEntity(dayIndex = 0, actionName = name, sets = sets, reps = reps, durationMin = dur, calories = cal, date = 0)); showAddPlan = false }
+    })
+    if (edit != null) AddFitnessDialog(initial = edit, onDismiss = { editItem = null }, onSave = { name, sets, reps, dur, cal ->
+        scope.launch { Repo.fitnessPlan.update(edit.copy(actionName = name, sets = sets, reps = reps, durationMin = dur, calories = cal)); editItem = null }
     })
 }
 
 @Composable
-private fun ProfileDialog(onDismiss: () -> Unit, initial: FitnessProfileEntity?, onSave: (FitnessProfileEntity) -> Unit) {
-    var height by remember { mutableStateOf(initial?.height?.toString() ?: "170") }
-    var weight by remember { mutableStateOf(initial?.weight?.toString() ?: "60") }
-    var level by remember { mutableStateOf(initial?.level ?: "初级") }
-    var goal by remember { mutableStateOf(initial?.goal ?: "减脂") }
+private fun FitnessItem(e: FitnessPlanEntity, onEdit: () -> Unit, onDelete: () -> Unit, onToggle: (Boolean) -> Unit) {
+    var showDel by remember { mutableStateOf(false) }
+    AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8), onClick = onEdit) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = e.done, onCheckedChange = onToggle)
+            Column(Modifier.weight(1f)) {
+                Text(e.actionName, fontWeight = FontWeight.SemiBold, color = if (e.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                val detail = if (e.reps > 0) "${e.sets}组 × ${e.reps}次" else "${e.durationMin}分钟"
+                Text(detail + if (e.calories > 0) " · ${e.calories} kcal" else "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, null) }
+            IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
+        }
+    }
+    if (showDel) ConfirmDeleteDialog(message = "确定删除动作「${e.actionName}」吗？") { onDelete() }
+}
+
+@Composable
+private fun AddFitnessDialog(initial: FitnessPlanEntity? = null, onDismiss: () -> Unit, onSave: (String, Int, Int, Int, Int) -> Unit) {
+    var name by remember { mutableStateOf(initial?.actionName ?: "") }
+    var mode by remember { mutableStateOf(if ((initial?.reps ?: 0) > 0) 0 else 1) } // 0 组次 / 1 时长
+    var sets by remember { mutableStateOf((initial?.sets ?: 3).toString()) }
+    var reps by remember { mutableStateOf((initial?.reps ?: 12).toString()) }
+    var dur by remember { mutableStateOf((initial?.durationMin ?: 30).toString()) }
+    var cal by remember { mutableStateOf((initial?.calories ?: 0).toString()) }
     AlertDialog(onDismissRequest = onDismiss, confirmButton = { TextButton(onClick = {
-        onSave(FitnessProfileEntity(height = height.toIntOrNull() ?: 170, weight = weight.toIntOrNull() ?: 60, level = level, goal = goal))
-    }) { Text("生成") } }, dismissButton = { TextButton(onDismiss) { Text("取消") } },
-        title = { Text("健身资料") }, text = {
+        val n = name.trim()
+        if (n.isBlank()) return@TextButton
+        val s = sets.toIntOrNull() ?: 0
+        val r = reps.toIntOrNull() ?: 0
+        val d = dur.toIntOrNull() ?: 0
+        val c = cal.toIntOrNull() ?: 0
+        onSave(n, if (mode == 0) s else 0, if (mode == 0) r else 0, if (mode == 1) d else 0, c)
+    }) { Text("保存") } }, dismissButton = { TextButton(onDismiss) { Text("取消") } },
+        title = { Text(if (initial == null) "添加动作" else "编辑动作") }, text = {
             Column {
-                OutlinedTextField(height, { height = it }, label = { Text("身高(cm)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(weight, { weight = it }, label = { Text("体重(kg)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                Text("运动基础"); Row { listOf("初级", "中级", "高级").forEach { l -> FilterChip(selected = level == l, onClick = { level = l }, label = { Text(l) }, modifier = Modifier.padding(end = 4.dp)) } }
-                Text("目标"); Row { listOf("减脂", "增肌", "塑形").forEach { g -> FilterChip(selected = goal == g, onClick = { goal = g }, label = { Text(g) }, modifier = Modifier.padding(end = 4.dp)) } }
+                OutlinedTextField(name, { name = it }, label = { Text("动作名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Spacer(Modifier.height(Dimen.s8))
+                Text("记录方式")
+                Row { listOf("组数×次数" to 0, "时长(分钟)" to 1).forEach { (t, v) -> FilterChip(selected = mode == v, onClick = { mode = v }, label = { Text(t) }, modifier = Modifier.padding(end = 4.dp)) } }
+                Spacer(Modifier.height(Dimen.s8))
+                if (mode == 0) {
+                    Row { OutlinedTextField(sets, { sets = it }, label = { Text("组数") }, modifier = Modifier.weight(1f), singleLine = true); Spacer(Modifier.width(Dimen.s8)); OutlinedTextField(reps, { reps = it }, label = { Text("每组次数") }, modifier = Modifier.weight(1f), singleLine = true) }
+                } else {
+                    OutlinedTextField(dur, { dur = it }, label = { Text("时长(分钟)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                }
+                Spacer(Modifier.height(Dimen.s8))
+                OutlinedTextField(cal, { cal = it }, label = { Text("消耗热量(kcal，可选)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             }
         })
 }

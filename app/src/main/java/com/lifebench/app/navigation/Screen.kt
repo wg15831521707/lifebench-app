@@ -5,10 +5,9 @@ package com.lifebench.app.navigation
  * 底部五大主导航 + 各子页面；带参路由用路由模板字符串（参数以 {name} 占位）。
  */
 object Routes {
-    // —— 五大主导航（底部导航栏）——
+    // —— 四大主导航（底部导航栏）——
     const val HOME = "home"
     const val TOOLS = "tools"
-    const val BRAIN = "brain"
     const val FIT = "fit"
     const val PROFILE = "profile"
 
@@ -27,6 +26,5 @@ object Routes {
     const val FITNESS = "fitness"
 
     // —— 脑力训练 ——
-    const val SCHULTE = "schulte"                 // 舒尔特方格
-    const val BRAIN_TRAIN = "brain_train/{category}" // 通用脑力训练，带分类参数（专注力/记忆力/逻辑）
+    const val SCHULTE = "schulte"                 // 舒尔特方格（唯一保留的训练模块）
 }

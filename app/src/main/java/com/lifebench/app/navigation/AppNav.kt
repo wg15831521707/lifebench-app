@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -21,10 +22,11 @@ import com.lifebench.app.ui.screens.profile.ProfileScreen
 import com.lifebench.app.ui.screens.tools.*
 
 /**
- * 全局导航：底部五大主导航 + 各子页面路由注册。
- * - 五大主导航（首页/工具/训练/健身/我的）在 NavBar 切换，单栈避免重复入栈。
+ * 全局导航：底部四大主导航 + 各子页面路由注册。
+ * - 四大主导航（首页/工具/健身/我的）在 NavBar 切换，单栈避免重复入栈。
  * - 子页面通过顶栏返回键 popBackStack 回到所属枢纽。
  * - 仅在顶级路由显示底部导航栏，进入子页自动隐藏，保证沉浸与空间。
+ * - 选中态只改变图标/文字颜色，不显示背景色块，视觉反馈更深。
  * - 页面过渡：进入右滑入淡入，退出左滑出淡出；返回反之，时长 280ms。
  */
 @Composable
@@ -69,7 +71,9 @@ fun AppNav() {
                                 }
                             },
                             icon = { Icon(tab.icon, contentDescription = tab.label) },
-                            label = { Text(tab.label) }
+                            label = { Text(tab.label) },
+                            // 仅图标/文字变色，不显示背景色块
+                            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                         )
                     }
                 }
@@ -81,10 +85,9 @@ fun AppNav() {
             startDestination = Routes.HOME,
             modifier = Modifier.fillMaxSize().padding(pad)
         ) {
-            // —— 五大主导航 ——
+            // —— 四大主导航 ——
             composable(Routes.HOME, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { HomeScreen(nav) }
             composable(Routes.TOOLS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { ToolsHubScreen(nav) }
-            composable(Routes.BRAIN, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { BrainHubScreen(nav) }
             composable(Routes.FIT, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { FitHubScreen(nav) }
             composable(Routes.PROFILE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { ProfileScreen(nav) }
 
@@ -102,12 +105,8 @@ fun AppNav() {
             composable(Routes.DIET, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { DietScreen(nav) }
             composable(Routes.FITNESS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { FitnessScreen(nav) }
 
-            // —— 脑力训练 ——
+            // —— 舒尔特方格（唯一保留的训练模块）——
             composable(Routes.SCHULTE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { SchulteScreen(nav) }
-            composable("brain_train/{category}", enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { back ->
-                val cat = back.arguments?.getString("category") ?: "专注力"
-                BrainTrainScreen(nav, cat)
-            }
         }
     }
 }

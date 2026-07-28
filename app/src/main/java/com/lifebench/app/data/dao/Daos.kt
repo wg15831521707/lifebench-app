@@ -10,7 +10,7 @@ interface TodoDao {
     @Insert suspend fun insert(e: TodoEntity): Long
     @Update suspend fun update(e: TodoEntity)
     @Delete suspend fun delete(e: TodoEntity)
-    @Query("SELECT * FROM todo WHERE archived=0 ORDER BY done ASC, priority DESC, createdAt DESC")
+    @Query("SELECT * FROM todo WHERE archived=0 ORDER BY done ASC, quadrant ASC, createdAt DESC")
     fun observeActive(): Flow<List<TodoEntity>>
     @Query("SELECT * FROM todo WHERE archived=1 ORDER BY createdAt DESC")
     fun observeArchived(): Flow<List<TodoEntity>>
@@ -41,6 +41,13 @@ data class CategorySum(
 interface SleepDao {
     @Insert suspend fun insert(e: SleepEntity): Long
     @Delete suspend fun delete(e: SleepEntity)
+    @Query("DELETE FROM sleep WHERE date=:day")
+    suspend fun deleteByDate(day: Long)
+    @Transaction
+    suspend fun upsertByDate(e: SleepEntity) {
+        deleteByDate(e.date)
+        insert(e)
+    }
     @Query("SELECT * FROM sleep ORDER BY date DESC LIMIT 7")
     fun observeRecent(): Flow<List<SleepEntity>>
     @Query("SELECT * FROM sleep")
@@ -61,6 +68,7 @@ interface RecipeDao {
 @Dao
 interface DietLogDao {
     @Insert suspend fun insert(e: DietLogEntity): Long
+    @Update suspend fun update(e: DietLogEntity)
     @Delete suspend fun delete(e: DietLogEntity)
     @Query("SELECT * FROM diet_log WHERE date=:day ORDER BY mealType ASC")
     fun observeByDate(day: Long): Flow<List<DietLogEntity>>

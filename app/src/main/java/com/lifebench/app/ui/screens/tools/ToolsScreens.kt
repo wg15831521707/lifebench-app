@@ -59,6 +59,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 fun ToolsHubScreen(nav: NavController) {
     val entries = listOf(
         ToolEntry("待办备忘录", Icons.Filled.Checklist, Routes.TODO),
+        ToolEntry("舒尔特方格", Icons.Filled.GridOn, Routes.SCHULTE),
         ToolEntry("密码保险箱", Icons.Filled.Lock, Routes.PASSWORD),
         ToolEntry("随手笔记", Icons.Filled.Note, Routes.NOTE),
         ToolEntry("纪念日倒计时", Icons.Filled.Celebration, Routes.ANNIVERSARY),
@@ -83,7 +84,9 @@ fun ToolsHubScreen(nav: NavController) {
 
 private data class ToolEntry(val label: String, val icon: ImageVector, val route: String)
 
-// ——— 待办备忘录 ———
+// ——— 待办备忘录（科维四象限）———
+private val QUADRANT_LABELS = listOf("重要且紧急", "重要不紧急", "紧急不重要", "不重要不紧急")
+
 @Composable
 fun TodoScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
@@ -105,29 +108,29 @@ fun TodoScreen(nav: NavController) {
                 Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("已完成") })
             }
             LazyColumn(Modifier.fillMaxSize().padding(Dimen.s16)) {
-                items(list, key = { it.id }) { item ->
-                    AppCard(Modifier.padding(bottom = Dimen.s12)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = item.done, onCheckedChange = {
-                                scope.launch { Repo.todo.update(item.copy(done = it, archived = it)) }
-                            })
-                            Column(Modifier.weight(1f).clickable { editItem = item }) {
-                                Text(item.title, fontWeight = FontWeight.SemiBold,
-                                    color = if (item.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-                                if (item.dueTime != null)
-                                    Text("到期 ${TimeUtil.formatHM(item.dueTime)} · ${item.repeatMode}",
-                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            val dot = when (item.priority) { 2 -> MaterialTheme.colorScheme.error; 1 -> LocalExtraColors.current.warning; else -> MaterialTheme.colorScheme.outline }
-                            Box(Modifier.size(10.dp).background(dot, CircleShape))
-                            Spacer(Modifier.width(Dimen.s4))
-                            IconButton(onClick = { scope.launch { Repo.todo.delete(item); AlarmScheduler.cancel(context, item.id.toInt()) } }) {
-                                Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (tab == 0) {
+                    for (q in 0..3) {
+                        val qs = list.filter { it.quadrant == q }
+                        if (qs.isNotEmpty()) {
+                            item { SectionTitle("  ${QUADRANT_LABELS[q]}") }
+                            items(qs, key = { it.id }) { item ->
+                                TodoRow(item,
+                                    onToggle = { scope.launch { Repo.todo.update(item.copy(done = it, archived = it)) } },
+                                    onEdit = { editItem = item },
+                                    onDelete = { scope.launch { Repo.todo.delete(item); AlarmScheduler.cancel(context, item.id.toInt()) } })
                             }
                         }
                     }
+                    if (list.isEmpty()) item { EmptyState("暂无进行中的待办，点 + 添加") }
+                } else {
+                    items(list, key = { it.id }) { item ->
+                        TodoRow(item,
+                            onToggle = { scope.launch { Repo.todo.update(item.copy(done = it, archived = it)) } },
+                            onEdit = { editItem = item },
+                            onDelete = { scope.launch { Repo.todo.delete(item); AlarmScheduler.cancel(context, item.id.toInt()) } })
+                    }
+                    if (list.isEmpty()) item { EmptyState("暂无已完成事项") }
                 }
-                if (list.isEmpty()) item { EmptyState(if (tab == 0) "暂无进行中的待办" else "暂无已完成事项") }
             }
         }
     }
@@ -150,10 +153,30 @@ fun TodoScreen(nav: NavController) {
 }
 
 @Composable
+private fun TodoRow(item: TodoEntity, onToggle: (Boolean) -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+    var showDel by remember { mutableStateOf(false) }
+    AppCard(Modifier.padding(bottom = Dimen.s12)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = item.done, onCheckedChange = onToggle)
+            Column(Modifier.weight(1f).clickable { onEdit() }) {
+                Text(item.title, fontWeight = FontWeight.SemiBold,
+                    textDecoration = if (item.done) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+                    color = if (item.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                if (item.dueTime != null)
+                    Text("到期 ${TimeUtil.formatHM(item.dueTime)} · ${item.repeatMode}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+    if (showDel) ConfirmDeleteDialog(message = "确定删除待办「${item.title}」吗？") { onDelete() }
+}
+
+@Composable
 private fun TodoEditDialog(initial: TodoEntity?, onDismiss: () -> Unit, onSave: (TodoEntity) -> Unit) {
     var title by remember { mutableStateOf(initial?.title ?: "") }
     var note by remember { mutableStateOf(initial?.note ?: "") }
-    var priority by remember { mutableStateOf(initial?.priority ?: 1) }
+    var quadrant by remember { mutableStateOf(initial?.quadrant ?: 2) }
     var dueTime by remember { mutableStateOf(initial?.dueTime) }
     var repeat by remember { mutableStateOf(initial?.repeatMode ?: "永不") }
     val context = LocalContext.current
@@ -162,8 +185,8 @@ private fun TodoEditDialog(initial: TodoEntity?, onDismiss: () -> Unit, onSave: 
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = {
             if (title.isBlank()) return@TextButton
-            onSave(initial?.copy(title = title, note = note, priority = priority, dueTime = dueTime, repeatMode = repeat)
-                ?: TodoEntity(title = title, note = note, priority = priority, dueTime = dueTime, repeatMode = repeat))
+            onSave(initial?.copy(title = title, note = note, quadrant = quadrant, dueTime = dueTime, repeatMode = repeat)
+                ?: TodoEntity(title = title, note = note, quadrant = quadrant, dueTime = dueTime, repeatMode = repeat))
         }) { Text("保存") } },
         dismissButton = { TextButton(onDismiss) { Text("取消") } },
         title = { Text(if (initial == null) "新建待办" else "编辑待办") },
@@ -173,10 +196,12 @@ private fun TodoEditDialog(initial: TodoEntity?, onDismiss: () -> Unit, onSave: 
                 Spacer(Modifier.height(Dimen.s8))
                 OutlinedTextField(note, { note = it }, label = { Text("备注") }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(Dimen.s8))
-                Text("优先级")
-                Row { listOf("低" to 0, "中" to 1, "高" to 2).forEach { (t, v) ->
-                    FilterChip(selected = priority == v, onClick = { priority = v }, label = { Text(t) }, modifier = Modifier.padding(end = 4.dp))
-                } }
+                Text("所属象限（科维四象限）")
+                FlowRow(Modifier.fillMaxWidth()) {
+                    QUADRANT_LABELS.forEachIndexed { q, label ->
+                        FilterChip(selected = quadrant == q, onClick = { quadrant = q }, label = { Text(label) }, modifier = Modifier.padding(end = 4.dp, bottom = 4.dp))
+                    }
+                }
                 Spacer(Modifier.height(Dimen.s8))
                 Text("重复")
                 Row { listOf("永不","每天","每周","每月","每年").forEach { r ->
@@ -222,6 +247,7 @@ fun PasswordScreen(nav: NavController) {
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
             items(items, key = { it.id }) { p ->
+                var showDel by remember { mutableStateOf(false) }
                 AppCard(Modifier.padding(bottom = Dimen.s12)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).clickable {
@@ -234,9 +260,10 @@ fun PasswordScreen(nav: NavController) {
                             Text("账号：${p.account}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("密码：••••••", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = { scope.launch { Repo.password.delete(p) } }) { Icon(Icons.Filled.Delete, null) }
+                        IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
                     }
                 }
+                if (showDel) ConfirmDeleteDialog(message = "确定删除密码条目「${p.title}」吗？") { scope.launch { Repo.password.delete(p) } }
             }
             if (items.isEmpty()) item { EmptyState("还没有密码条目，点击 + 添加") }
         }
@@ -308,9 +335,10 @@ private fun NoteEditDialog(initial: NoteEntity?, onDismiss: () -> Unit, onSave: 
     var title by remember { mutableStateOf(initial?.title ?: "") }
     var content by remember { mutableStateOf(initial?.content ?: "") }
     var cat by remember { mutableStateOf(initial?.category ?: "默认") }
+    var showDel by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = { if (title.isBlank()) return@TextButton; onSave(title, content, cat) }) { Text("保存") } },
-        dismissButton = { Row { if (initial != null) TextButton(onDelete) { Text("删除") }; TextButton(onDismiss) { Text("取消") } } },
+        dismissButton = { Row { if (initial != null) TextButton(onClick = { showDel = true }) { Text("删除") }; TextButton(onDismiss) { Text("取消") } } },
         title = { Text(if (initial==null) "新建笔记" else "编辑笔记") },
         text = {
             Column {
@@ -319,6 +347,8 @@ private fun NoteEditDialog(initial: NoteEntity?, onDismiss: () -> Unit, onSave: 
                 OutlinedTextField(cat, { cat = it }, label = { Text("分类") }, modifier = Modifier.fillMaxWidth())
             }
         })
+    }
+    if (showDel) ConfirmDeleteDialog(message = "确定删除这条笔记吗？") { onDelete() }
 }
 
 // ——— 纪念日倒计时 ———
@@ -336,6 +366,7 @@ fun AnniversaryScreen(nav: NavController) {
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
             items(items, key = { it.id }) { a ->
                 val days = TimeUtil.daysUntil(a.date)
+                var showDel by remember { mutableStateOf(false) }
                 AppCard(Modifier.padding(bottom = Dimen.s12)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(a.icon, fontSize = 28.dp.value.sp)
@@ -347,9 +378,10 @@ fun AnniversaryScreen(nav: NavController) {
                         val near = days in 0..7
                         Text((if (days >= 0) "还有 ${days} 天" else "已过 ${-days} 天"),
                             color = if (near) LocalExtraColors.current.warning else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                        IconButton(onClick = { scope.launch { Repo.anniversary.delete(a); AlarmScheduler.cancel(context, a.id.toInt()) } }) { Icon(Icons.Filled.Delete, null) }
+                        IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
                     }
                 }
+                if (showDel) ConfirmDeleteDialog(message = "确定删除纪念日「${a.name}」吗？") { scope.launch { Repo.anniversary.delete(a); AlarmScheduler.cancel(context, a.id.toInt()) } }
             }
             if (items.isEmpty()) item { EmptyState("添加重要的日子，准时提醒") }
         }

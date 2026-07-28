@@ -124,3 +124,24 @@ fun AddFloating(onClick: () -> Unit) {
         Icon(Icons.Filled.Add, contentDescription = "新增")
     }
 }
+
+/** 通用删除确认对话框：避免误删笔记/待办/密码/纪念日/记账/菜谱/饮食等条目。 */
+@Composable
+fun ConfirmDeleteDialog(
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit = {},
+    title: String = "删除确认"
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(); onDismiss() }) {
+                Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("取消") } }
+    )
+}
