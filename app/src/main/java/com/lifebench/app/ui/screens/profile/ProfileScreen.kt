@@ -78,11 +78,14 @@ fun ProfileScreen(nav: NavController) {
             Spacer(Modifier.height(Dimen.s8))
             PrimaryButton("导入备份恢复", onClick = {
                 scope.launch {
-                    context.filesDir.listFiles { it.name.endsWith(".json") }
-                        ?.sortedByDescending { it.lastModified() }?.firstOrNull()?.let { f ->
-                            val r = BackupUtil.importAll(context, f)
-                            Toast.makeText(context, if (r) "恢复成功" else "恢复失败", Toast.LENGTH_SHORT).show()
-                        } ?: Toast.makeText(context, "未找到备份文件", Toast.LENGTH_SHORT).show()
+                    val files = context.filesDir.listFiles { it.name.endsWith(".json") }
+                    val latest = files?.sortedByDescending { it.lastModified() }?.firstOrNull()
+                    if (latest != null) {
+                        val r = BackupUtil.importAll(context, latest)
+                        Toast.makeText(context, if (r) "恢复成功" else "恢复失败", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "未找到备份文件", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }, icon = Icons.Filled.FileUpload)
         }

@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -35,16 +36,16 @@ fun AppNav() {
     val showBottom = currentRoute in BottomTabs.map { it.route }
 
     // 统一的页面过渡动画（命名过渡参数挂到每个 composable 上，兼容 navigation-compose 2.7.x）
-    val enterT: AnimatedContentTransitionScope<String>.() -> EnterTransition = {
+    val enterT: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
         fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 }
     }
-    val exitT: AnimatedContentTransitionScope<String>.() -> ExitTransition = {
+    val exitT: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
         fadeOut(animationSpec = tween(280)) + slideOutHorizontally(animationSpec = tween(280)) { -it / 6 }
     }
-    val popEnterT: AnimatedContentTransitionScope<String>.() -> EnterTransition = {
+    val popEnterT: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
         fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 }
     }
-    val popExitT: AnimatedContentTransitionScope<String>.() -> ExitTransition = {
+    val popExitT: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
         fadeOut(animationSpec = tween(280)) + slideOutHorizontally(animationSpec = tween(280)) { it / 6 }
     }
 
