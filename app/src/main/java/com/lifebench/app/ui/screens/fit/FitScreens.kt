@@ -5,6 +5,7 @@ import android.app.TimePickerDialog
 import android.content.Intent
 import android.widget.Toast
 import com.lifebench.app.service.FocusService
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,6 +42,7 @@ import java.util.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -767,15 +769,15 @@ private fun WeekPlanner(plans: List<TrainingPlan>, curDay: String, onPick: (Stri
 @Composable
 private fun StatRow(plans: List<TrainingPlan>) {
     Row(Modifier.fillMaxWidth().padding(horizontal = Dimen.s16), horizontalArrangement = Arrangement.spacedBy(Dimen.s12)) {
-        StatCard("本周训练", "${weekTrainingDays(plans)} 天", Icons.Filled.DateRange)
-        StatCard("预计消耗", "${weeklyKcal(plans)} kcal", Icons.Filled.Whatshot)
-        StatCard("连续打卡", "${streakDays(plans)} 天", Icons.Filled.EmojiEvents)
+        StatCard("本周训练", "${weekTrainingDays(plans)} 天", Icons.Filled.DateRange, Modifier.weight(1f))
+        StatCard("预计消耗", "${weeklyKcal(plans)} kcal", Icons.Filled.Whatshot, Modifier.weight(1f))
+        StatCard("连续打卡", "${streakDays(plans)} 天", Icons.Filled.EmojiEvents, Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun StatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    AppCard(Modifier.weight(1f)) {
+private fun StatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
+    AppCard(modifier) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary, Modifier.size(20.dp))
         Spacer(Modifier.height(Dimen.s6))
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -953,7 +955,7 @@ fun TrainingSessionScreen(nav: NavController, onBack: (() -> Unit)? = null) {
     val plans = parsePlans(plansJson)
     val day = todayWeekday()
     val acts = actionsForDay(plans, day)
-    val back = onBack ?: { nav.popBackStack() }
+    val back: () -> Unit = onBack ?: { nav.popBackStack() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("开始训练 · 周$day", showBack = true, onBack = back)
         Spacer(Modifier.height(Dimen.s12))
