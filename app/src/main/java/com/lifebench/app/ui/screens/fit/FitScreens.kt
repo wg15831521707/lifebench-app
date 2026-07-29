@@ -38,39 +38,119 @@ import com.lifebench.app.util.WhiteNoisePlayer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.*
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.viewinterop.AndroidView
 
 /**
  * ===== 健身饮食专区：枢纽 + 番茄钟 + 睡眠 + 记账 + 饮食菜谱 + 健身计划 =====
  */
 
-// ——— 健身饮食枢纽 ———
-@Composable
-fun FitHubScreen(nav: NavController) {
-    val entries = listOf(
-        ToolEntry("番茄钟专注", Icons.Filled.Alarm, Routes.FOCUS),
-        ToolEntry("睡眠记录", Icons.Filled.Bedtime, Routes.SLEEP),
-        ToolEntry("收支记账", Icons.Filled.AccountBalanceWallet, Routes.ACCOUNT),
-        ToolEntry("饮食菜谱", Icons.Filled.Restaurant, Routes.DIET),
-        ToolEntry("健身计划", Icons.Filled.FitnessCenter, Routes.FITNESS),
-    )
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AppTopBar("健身饮食")
-        Spacer(Modifier.height(Dimen.s12))
-        entries.forEach { e ->
-            AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s12), onClick = { nav.navigate(e.route) }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(e.icon, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(Dimen.s12))
-                    Text(e.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        Spacer(Modifier.height(Dimen.s24))
+// ——— 训练计划数据模型（存 DataStore JSON，免 Room 迁移）———
+private data class TrainingAction(
+    val name: String,
+    val muscle: String,
+    val sets: Int,
+    val reps: Int,
+    val videoUrl: String = ""
+)
+private data class TrainingPlan(
+    val name: String,
+    val days: List<String>,
+    val note: String,
+    val actions: List<TrainingAction>
+)
+
+private val PLAN_LIST_TYPE = object : com.google.gson.reflect.TypeToken<List<TrainingPlan>>() {}.type
+private fun parsePlans(json: String): List<TrainingPlan> = try {
+    com.google.gson.Gson().fromJson(json, PLAN_LIST_TYPE) ?: emptyList()
+} catch (_: Exception) { emptyList() }
+private fun plansToJson(list: List<TrainingPlan>): String = com.google.gson.Gson().toJson(list)
+private suspend fun savePlans(list: List<TrainingPlan>) = Repo.settings.setTrainingPlansJson(plansToJson(list))
+
+// 周几顺序与真实星期映射、派生计算
+private val WEEK_ORDER = listOf("一", "二", "三", "四", "五", "六", "日")
+private fun todayWeekday(): String {
+    val cal = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) // 1=周日..7=周六
+    return WEEK_ORDER[(cal - 2 + 7) % 7]
+}
+private fun plansForDay(plans: List<TrainingPlan>, k: String): List<TrainingPlan> = plans.filter { k in it.days }
+private fun actionsForDay(plans: List<TrainingPlan>, k: String): List<TrainingAction> = plansForDay(plans, k).flatMap { it.actions }
+private fun muscleLabelFor(plans: List<TrainingPlan>): String {
+    val ms = plans.flatMap { it.actions.map { a -> a.muscle } }.filter { it.isNotBlank() }.toSet()
+    return if (ms.isNotEmpty()) ms.joinToString("+") else plans.firstOrNull()?.name ?: "训练"
+}
+private fun weekTrainingDays(plans: List<TrainingPlan>): Int = WEEK_ORDER.count { plansForDay(plans, it).isNotEmpty() }
+private fun weeklyKcal(plans: List<TrainingPlan>): Int = ((plans.sumOf { it.actions.size } * 80) / 10) * 10
+private fun streakDays(plans: List<TrainingPlan>): Int {
+    val today = todayWeekday()
+    var count = 0
+    val idx = WEEK_ORDER.indexOf(today)
+    for (i in 0 until 7) {
+        val k = WEEK_ORDER[(idx - i + 7) % 7]
+        if (plansForDay(plans, k).isNotEmpty()) count++ else break
     }
+    return count
 }
 
-private data class ToolEntry(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val route: String)
+// 三分化动作池（生成计划时按器材过滤）
+private data class PoolAction(val name: String, val muscle: String, val equip: String, val sets: Int, val reps: Int)
+private val ACTIONS_POOL = listOf(
+    PoolAction("哑铃卧推", "胸", "哑铃", 4, 10),
+    PoolAction("俯卧撑", "胸", "徒手", 4, 12),
+    PoolAction("哑铃飞鸟", "胸", "哑铃", 3, 12),
+    PoolAction("绳索下压", "三头", "器械", 3, 12),
+    PoolAction("臂屈伸", "三头", "徒手", 3, 12),
+    PoolAction("杠铃划船", "背", "杠铃", 4, 10),
+    PoolAction("引体向上", "背", "徒手", 4, 8),
+    PoolAction("哑铃弯举", "二头", "哑铃", 3, 12),
+    PoolAction("弹力带弯举", "二头", "弹力带", 3, 15),
+    PoolAction("深蹲", "腿", "杠铃", 4, 10),
+    PoolAction("箭步蹲", "腿", "徒手", 3, 12),
+    PoolAction("腿举", "腿", "器械", 4, 12),
+    PoolAction("哑铃推举", "肩", "哑铃", 3, 12),
+    PoolAction("侧平举", "肩", "哑铃", 3, 15),
+    PoolAction("平板支撑", "核心", "徒手", 3, 0)
+)
+private fun buildThreeSplit(equip: Set<String>): List<TrainingPlan> {
+    fun pick(groups: List<String>) = ACTIONS_POOL.filter { it.muscle in groups && it.equip in equip }
+        .map { TrainingAction(it.name, it.muscle, it.sets, it.reps) }
+    fun mk(name: String, days: List<String>, acts: List<TrainingAction>): TrainingPlan {
+        val a = if (acts.isEmpty()) listOf(TrainingAction("徒手${name}训练", if (name == "推") "胸" else if (name == "拉") "背" else "腿", 3, 12)) else acts
+        return TrainingPlan(name, days, "", a)
+    }
+    return listOf(
+        mk("推", listOf("一", "四"), pick(listOf("胸", "三头"))),
+        mk("拉", listOf("二", "五"), pick(listOf("背", "二头"))),
+        mk("腿", listOf("三", "六"), pick(listOf("腿", "肩")))
+    )
+}
+
+// 问候语 / 日期提示 / 激励语
+private fun greeting(): String {
+    val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when { h < 6 -> "凌晨好"; h < 12 -> "早上好"; h < 14 -> "中午好"; h < 18 -> "下午好"; else -> "晚上好" }
+}
+private fun dateHint(plans: List<TrainingPlan>, curDay: String): String {
+    val today = todayWeekday()
+    return if (curDay == today) {
+        if (actionsForDay(plans, today).isNotEmpty()) "今天有训练计划" else "今天休息，好好恢复"
+    } else "周$curDay"
+}
+private val MOTIVATIONS = listOf(
+    "今天也要动起来 💪", "坚持就是胜利，练一组是一组", "身体是革命的本钱，开始吧",
+    "一点点进步，也是进步", "给自己一个流汗的理由", "自律给你自由", "今天不练，明天后悔"
+)
+private fun motivationText(day: String): String = MOTIVATIONS[WEEK_ORDER.indexOf(day).coerceIn(0, MOTIVATIONS.lastIndex)]
+
+// 品牌绿（与效果图一致）
+private val BRAND_GREEN = Color(0xFFB6E946)
+private val BRAND_GREEN2 = Color(0xFF9DD63B)
 
 // ——— 番茄钟专注 ———
 @Composable
@@ -519,124 +599,418 @@ private fun RecipeAddDialog(onDismiss: () -> Unit, onSave: (String, String, Stri
         })
 }
 
-// ——— 健身计划：记录动作 + 运动规划 ———
+// ——— 健身训练（新）：枢纽 + 手动添加 + 生成计划 + 开始训练 ———
 @Composable
 fun FitnessScreen(nav: NavController) {
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val plan by Repo.fitnessPlan.observeAll().collectAsStateWithLifecycle(emptyList())
-    val today = TimeUtil.dayKey()
-    val records = plan.filter { it.date == today }
-    val templates = plan.filter { it.date == 0L }
-    var showAddRecord by remember { mutableStateOf(false) }
-    var showAddPlan by remember { mutableStateOf(false) }
-    var editItem by remember { mutableStateOf<FitnessPlanEntity?>(null) }
+    var view by remember { mutableStateOf<String?>(null) }
+    when (view) {
+        "add" -> ManualAddView(onBack = { view = null })
+        "generate" -> GeneratePlanView(onBack = { view = null })
+        "train" -> TrainingSessionScreen(nav, onBack = { view = null })
+        else -> FitnessMainView(
+            onAdd = { view = "add" },
+            onGenerate = { view = "generate" },
+            onTrain = { view = "train" }
+        )
+    }
+}
 
-    val todayCal = records.sumOf { it.calories }
-    val todayDur = records.sumOf { it.durationMin }
+@Composable
+private fun FitnessMainView(onAdd: () -> Unit, onGenerate: () -> Unit, onTrain: () -> Unit) {
+    val plansJson by Repo.settings.trainingPlansJson.collectAsStateWithLifecycle("[]")
+    val plans = parsePlans(plansJson)
+    var curDay by remember { mutableStateOf(todayWeekday()) }
+    var showSheet by remember { mutableStateOf(false) }
+
+    val dayActions = actionsForDay(plans, curDay)
+    var doneKeys by remember { mutableStateOf(setOf<String>()) }
+    val doneCount = dayActions.count { "${curDay}:${it.name}" in doneKeys }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AppTopBar("健身计划", showBack = true, onBack = { nav.popBackStack() })
-        Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            MetricLine(icon = Icons.Filled.FitnessCenter, label = "今日消耗", value = "$todayCal kcal", valueColor = LocalExtraColors.current.success)
+        // 顶部问候 + 添加按钮
+        Row(Modifier.fillMaxWidth().padding(horizontal = Dimen.s16, vertical = Dimen.s8), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(greeting(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(TimeUtil.formatMonthDay(System.currentTimeMillis()) + " · " + dateHint(plans, curDay),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Box(Modifier.size(46.dp).background(BRAND_GREEN, CircleShape).clickable { showSheet = true },
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Add, null, tint = Color(0xFF111418), Modifier.size(26.dp))
+            }
         }
         Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("今日动作统计", style = MaterialTheme.typography.titleMedium)
-            Text("动作 ${records.size} 个 · 时长 ${todayDur} 分 · 消耗 ${todayCal} kcal", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(Dimen.s8))
-            PrimaryButton("＋ 记录今日动作", onClick = { showAddRecord = true }, icon = Icons.Filled.Add)
-        }
+        HeroCard(plans, curDay, doneCount, dayActions.size, onTrain)
+        Spacer(Modifier.height(Dimen.s12))
+        WeekPlanner(plans, curDay) { curDay = it; doneKeys = setOf() }
         Spacer(Modifier.height(Dimen.s12))
         SectionTitle("  今日动作")
         Spacer(Modifier.height(Dimen.s8))
-        records.sortedByDescending { it.id }.forEach { a ->
-            FitnessItem(a,
-                onEdit = { editItem = a },
-                onDelete = { scope.launch { Repo.fitnessPlan.delete(a) } },
-                onToggle = { scope.launch { Repo.fitnessPlan.update(a.copy(done = it)) } })
-        }
-        if (records.isEmpty()) EmptyState("今天还没记录动作，点击上方按钮打卡")
-        Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("健身计划（模板）", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                TextButton(onClick = { showAddPlan = true }) { Text("＋ 添加") }
+        if (dayActions.isEmpty()) {
+            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(motivationText(curDay), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(Dimen.s8))
+                    TextButton(onClick = onAdd) { Text("＋ 添加训练计划") }
+                }
+            }
+        } else {
+            dayActions.forEach { a ->
+                val key = "${curDay}:${a.name}"
+                AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = key in doneKeys, onCheckedChange = { doneKeys = if (it) doneKeys + key else doneKeys - key })
+                        Column(Modifier.weight(1f)) {
+                            Text(a.name, fontWeight = FontWeight.SemiBold,
+                                color = if (key in doneKeys) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                            Text("${a.muscle} · ${a.sets}组 × ${a.reps}次", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         }
-        Spacer(Modifier.height(Dimen.s8))
-        templates.forEach { a ->
-            FitnessItem(a,
-                onEdit = { editItem = a },
-                onDelete = { scope.launch { Repo.fitnessPlan.delete(a) } },
-                onToggle = { scope.launch { Repo.fitnessPlan.update(a.copy(done = it)) } })
-        }
-        if (templates.isEmpty()) EmptyState("还没有健身计划，添加你想练的动作吧")
+        Spacer(Modifier.height(Dimen.s12))
+        StatRow(plans)
         Spacer(Modifier.height(Dimen.s24))
     }
 
-    val edit = editItem
-    if (showAddRecord) AddFitnessDialog(onDismiss = { showAddRecord = false }, onSave = { name, sets, reps, dur, cal ->
-        scope.launch { Repo.fitnessPlan.insert(FitnessPlanEntity(dayIndex = Calendar.getInstance().get(Calendar.DAY_OF_WEEK), actionName = name, sets = sets, reps = reps, durationMin = dur, calories = cal, date = today)); showAddRecord = false }
-    })
-    if (showAddPlan) AddFitnessDialog(onDismiss = { showAddPlan = false }, onSave = { name, sets, reps, dur, cal ->
-        scope.launch { Repo.fitnessPlan.insert(FitnessPlanEntity(dayIndex = 0, actionName = name, sets = sets, reps = reps, durationMin = dur, calories = cal, date = 0)); showAddPlan = false }
-    })
-    if (edit != null) AddFitnessDialog(initial = edit, onDismiss = { editItem = null }, onSave = { name, sets, reps, dur, cal ->
-        scope.launch { Repo.fitnessPlan.update(edit.copy(actionName = name, sets = sets, reps = reps, durationMin = dur, calories = cal)); editItem = null }
-    })
-}
-
-@Composable
-private fun FitnessItem(e: FitnessPlanEntity, onEdit: () -> Unit, onDelete: () -> Unit, onToggle: (Boolean) -> Unit) {
-    var showDel by remember { mutableStateOf(false) }
-    AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8), onClick = onEdit) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = e.done, onCheckedChange = onToggle)
-            Column(Modifier.weight(1f)) {
-                Text(e.actionName, fontWeight = FontWeight.SemiBold, color = if (e.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-                val detail = if (e.reps > 0) "${e.sets}组 × ${e.reps}次" else "${e.durationMin}分钟"
-                Text(detail + if (e.calories > 0) " · ${e.calories} kcal" else "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, null) }
-            IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
-        }
-    }
-    if (showDel) ConfirmDeleteDialog(message = "确定删除动作「${e.actionName}」吗？", onDismiss = { showDel = false }) { onDelete() }
-}
-
-@Composable
-private fun AddFitnessDialog(initial: FitnessPlanEntity? = null, onDismiss: () -> Unit, onSave: (String, Int, Int, Int, Int) -> Unit) {
-    var name by remember { mutableStateOf(initial?.actionName ?: "") }
-    var mode by remember { mutableStateOf(if ((initial?.reps ?: 0) > 0) 0 else 1) } // 0 组次 / 1 时长
-    var sets by remember { mutableStateOf((initial?.sets ?: 3).toString()) }
-    var reps by remember { mutableStateOf((initial?.reps ?: 12).toString()) }
-    var dur by remember { mutableStateOf((initial?.durationMin ?: 30).toString()) }
-    var cal by remember { mutableStateOf((initial?.calories ?: 0).toString()) }
-    AlertDialog(onDismissRequest = onDismiss, confirmButton = { TextButton(onClick = {
-        val n = name.trim()
-        if (n.isBlank()) return@TextButton
-        val s = sets.toIntOrNull() ?: 0
-        val r = reps.toIntOrNull() ?: 0
-        val d = dur.toIntOrNull() ?: 0
-        val c = cal.toIntOrNull() ?: 0
-        onSave(n, if (mode == 0) s else 0, if (mode == 0) r else 0, if (mode == 1) d else 0, c)
-    }) { Text("保存") } }, dismissButton = { TextButton(onDismiss) { Text("取消") } },
-        title = { Text(if (initial == null) "添加动作" else "编辑动作") }, text = {
-            Column {
-                OutlinedTextField(name, { name = it }, label = { Text("动作名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                Spacer(Modifier.height(Dimen.s8))
-                Text("记录方式")
-                Row { listOf("组数×次数" to 0, "时长(分钟)" to 1).forEach { (t, v) -> FilterChip(selected = mode == v, onClick = { mode = v }, label = { Text(t) }, modifier = Modifier.padding(end = 4.dp)) } }
-                Spacer(Modifier.height(Dimen.s8))
-                if (mode == 0) {
-                    Row { OutlinedTextField(sets, { sets = it }, label = { Text("组数") }, modifier = Modifier.weight(1f), singleLine = true); Spacer(Modifier.width(Dimen.s8)); OutlinedTextField(reps, { reps = it }, label = { Text("每组次数") }, modifier = Modifier.weight(1f), singleLine = true) }
-                } else {
-                    OutlinedTextField(dur, { dur = it }, label = { Text("时长(分钟)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+    if (showSheet) {
+        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = Dimen.s16, vertical = Dimen.s16)) {
+                Text("添加训练计划", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(Dimen.s12))
+                AppCard(Modifier.padding(bottom = Dimen.s12).clickable { showSheet = false; onAdd() }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(Dimen.s12))
+                        Text("📝 手动添加计划", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                AppCard(Modifier.clickable { showSheet = false; onGenerate() }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(Dimen.s12))
+                        Text("✨ 生成计划（三分化）", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Spacer(Modifier.height(Dimen.s8))
-                OutlinedTextField(cal, { cal = it }, label = { Text("消耗热量(kcal，可选)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             }
-        })
+        }
+    }
+}
+
+@Composable
+private fun HeroCard(plans: List<TrainingPlan>, day: String, done: Int, total: Int, onTrain: () -> Unit) {
+    val has = total > 0
+    Card(Modifier.padding(horizontal = Dimen.s16), shape = RoundedCornerShape(Dimen.cardRadius),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+        Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(BRAND_GREEN, BRAND_GREEN2))).padding(Dimen.s16)) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("DAY $day", color = Color(0xFF111418), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(Dimen.s4))
+                        Text(muscleLabelFor(plansForDay(plans, day)), color = Color(0xFF1B1F23), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(Dimen.s4))
+                        Text("${total} 个动作${if (has) " · 约 ${total * 8} 分钟" else ""}", color = Color(0xFF1B1F23), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(progress = { if (total > 0) done.toFloat() / total else 0f },
+                            strokeWidth = 8.dp, modifier = Modifier.size(64.dp),
+                            color = Color(0xFF111418), trackColor = Color(0x33111418))
+                        Text("$done/$total", color = Color(0xFF111418), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (has) {
+                    Spacer(Modifier.height(Dimen.s12))
+                    Button(onClick = onTrain, modifier = Modifier.fillMaxWidth().height(44.dp),
+                        shape = RoundedCornerShape(Dimen.btnRadius),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White)) {
+                        Icon(Icons.Filled.PlayArrow, null, tint = Color(0xFF111418), Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("开始训练", color = Color(0xFF111418), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekPlanner(plans: List<TrainingPlan>, curDay: String, onPick: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Dimen.s16),
+        horizontalArrangement = Arrangement.spacedBy(Dimen.s8)) {
+        WEEK_ORDER.forEach { k ->
+            val has = plansForDay(plans, k).isNotEmpty()
+            val selected = k == curDay
+            Column(
+                Modifier.width(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
+                    .border(if (selected) 2.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
+                    .clickable { onPick(k) }.padding(vertical = Dimen.s12),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(k, fontWeight = FontWeight.SemiBold, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(Dimen.s4))
+                Text(if (has) muscleLabelFor(plansForDay(plans, k)) else "无",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (has) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatRow(plans: List<TrainingPlan>) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = Dimen.s16), horizontalArrangement = Arrangement.spacedBy(Dimen.s12)) {
+        StatCard("本周训练", "${weekTrainingDays(plans)} 天", Icons.Filled.DateRange)
+        StatCard("预计消耗", "${weeklyKcal(plans)} kcal", Icons.Filled.Whatshot)
+        StatCard("连续打卡", "${streakDays(plans)} 天", Icons.Filled.EmojiEvents)
+    }
+}
+
+@Composable
+private fun StatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    AppCard(Modifier.weight(1f)) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, Modifier.size(20.dp))
+        Spacer(Modifier.height(Dimen.s6))
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+// ——— 手动添加计划 ———
+private class ActionRowState(name: String = "", muscle: String = "", sets: String = "3", reps: String = "12") {
+    val name = mutableStateOf(name)
+    val muscle = mutableStateOf(muscle)
+    val sets = mutableStateOf(sets)
+    val reps = mutableStateOf(reps)
+}
+
+@Composable
+private fun ManualAddView(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val plansJson by Repo.settings.trainingPlansJson.collectAsStateWithLifecycle("[]")
+    val plans = parsePlans(plansJson)
+    var planName by remember { mutableStateOf("") }
+    var selectedDays by remember { mutableStateOf(setOf<String>()) }
+    val rows = remember { mutableStateListOf(ActionRowState(), ActionRowState()) }
+    var note by remember { mutableStateOf("") }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        AppTopBar("添加训练计划", showBack = true, onBack = onBack)
+        Spacer(Modifier.height(Dimen.s12))
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            OutlinedTextField(planName, { planName = it }, label = { Text("计划名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Spacer(Modifier.height(Dimen.s8))
+            Text("训练日（可多选）")
+            FlowRow(Modifier.fillMaxWidth()) {
+                WEEK_ORDER.forEach { d ->
+                    FilterChip(selected = d in selectedDays, onClick = { selectedDays = if (d in selectedDays) selectedDays - d else selectedDays + d },
+                        label = { Text(d) }, modifier = Modifier.padding(end = 4.dp, bottom = 4.dp))
+                }
+            }
+        }
+        Spacer(Modifier.height(Dimen.s12))
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            Text("动作列表", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Dimen.s8))
+            rows.forEachIndexed { i, r ->
+                ActionRowEditor(r, onDelete = { rows.removeAt(i) })
+                Spacer(Modifier.height(Dimen.s8))
+            }
+            TextButton(onClick = { rows.add(ActionRowState()) }) { Text("＋ 添加动作") }
+        }
+        Spacer(Modifier.height(Dimen.s12))
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            OutlinedTextField(note, { note = it }, label = { Text("备注（可选）") }, modifier = Modifier.fillMaxWidth())
+        }
+        Spacer(Modifier.height(Dimen.s12))
+        PrimaryButton("保存计划", onClick = {
+            if (planName.isBlank()) { Toast.makeText(context, "请填写计划名称", Toast.LENGTH_SHORT).show(); return@PrimaryButton }
+            if (selectedDays.isEmpty()) { Toast.makeText(context, "请至少选择一个训练日", Toast.LENGTH_SHORT).show(); return@PrimaryButton }
+            val acts = rows.filter { it.name.value.isNotBlank() }.map {
+                TrainingAction(name = it.name.value.trim(), muscle = it.muscle.value.ifBlank { "其他" },
+                    sets = it.sets.value.toIntOrNull() ?: 3, reps = it.reps.value.toIntOrNull() ?: 12)
+            }
+            scope.launch {
+                savePlans(plans + TrainingPlan(planName.trim(), selectedDays.toList(), note.trim(), acts))
+                Toast.makeText(context, "已保存计划", Toast.LENGTH_SHORT).show()
+                onBack()
+            }
+        }, modifier = Modifier.padding(horizontal = Dimen.s16), icon = Icons.Filled.Save)
+        Spacer(Modifier.height(Dimen.s16))
+        SectionTitle("  我的计划")
+        Spacer(Modifier.height(Dimen.s8))
+        if (plans.isEmpty()) EmptyState("还没有任何计划")
+        else plans.forEachIndexed { i, p ->
+            var showDel by remember { mutableStateOf(false) }
+            AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(p.name, fontWeight = FontWeight.SemiBold)
+                        Text("训练日：${p.days.joinToString(" · ")} · ${p.actions.size} 个动作",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error) }
+                }
+            }
+            if (showDel) ConfirmDeleteDialog(
+                message = "确定删除计划「${p.name}」吗？此操作仅删除这一个计划。",
+                onDismiss = { showDel = false }
+            ) {
+                scope.launch {
+                    savePlans(plans.filterIndexed { index, _ -> index != i })
+                    Toast.makeText(context, "已删除计划", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        Spacer(Modifier.height(Dimen.s24))
+    }
+}
+
+@Composable
+private fun ActionRowEditor(state: ActionRowState, onDelete: () -> Unit) {
+    AppCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(state.name.value, { state.name.value = it }, label = { Text("动作名称") }, modifier = Modifier.weight(1f), singleLine = true)
+            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        Spacer(Modifier.height(Dimen.s6))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(state.muscle.value, { state.muscle.value = it }, label = { Text("部位") }, modifier = Modifier.weight(1f), singleLine = true)
+            Spacer(Modifier.width(Dimen.s8))
+            OutlinedTextField(state.sets.value, { state.sets.value = it }, label = { Text("组") }, modifier = Modifier.width(64.dp), singleLine = true)
+            Spacer(Modifier.width(Dimen.s8))
+            OutlinedTextField(state.reps.value, { state.reps.value = it }, label = { Text("次") }, modifier = Modifier.width(64.dp), singleLine = true)
+        }
+    }
+}
+
+// ——— 生成计划（三分化）———
+@Composable
+private fun GeneratePlanView(onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val plansJson by Repo.settings.trainingPlansJson.collectAsStateWithLifecycle("[]")
+    val plans = parsePlans(plansJson)
+    val equipments = listOf("哑铃", "杠铃", "弹力带", "徒手", "器械", "瑜伽垫")
+    var selected by remember { mutableStateOf(setOf<String>()) }
+    var showClear by remember { mutableStateOf(false) }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        AppTopBar("生成训练计划", showBack = true, onBack = onBack)
+        Spacer(Modifier.height(Dimen.s12))
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            Text("选择你可用的器材", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Dimen.s8))
+            Text("将按推 / 拉 / 腿三分化生成计划，只含你能做的动作。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(Dimen.s8))
+            FlowRow(Modifier.fillMaxWidth()) {
+                equipments.forEach { e ->
+                    FilterChip(selected = e in selected, onClick = { selected = if (e in selected) selected - e else selected + e },
+                        label = { Text(e) }, modifier = Modifier.padding(end = 4.dp, bottom = 4.dp))
+                }
+            }
+        }
+        Spacer(Modifier.height(Dimen.s12))
+        PrimaryButton("生成计划", onClick = {
+            scope.launch {
+                savePlans(plans + buildThreeSplit(selected.ifEmpty { setOf("徒手") }))
+                Toast.makeText(context, "已生成三分化计划", Toast.LENGTH_SHORT).show()
+                onBack()
+            }
+        }, modifier = Modifier.padding(horizontal = Dimen.s16), icon = Icons.Filled.AutoAwesome)
+        Spacer(Modifier.height(Dimen.s12))
+        TextButton(onClick = { showClear = true }, modifier = Modifier.padding(horizontal = Dimen.s16)) {
+            Text("🗑 清空所有计划", color = MaterialTheme.colorScheme.error)
+        }
+        Spacer(Modifier.height(Dimen.s24))
+    }
+    if (showClear) ConfirmDeleteDialog(
+        message = "确定要清空全部训练计划吗？此操作不可撤销。",
+        title = "清空确认",
+        onDismiss = { showClear = false }
+    ) {
+        scope.launch {
+            savePlans(emptyList())
+            Toast.makeText(context, "已清空所有计划", Toast.LENGTH_SHORT).show()
+            onBack()
+        }
+    }
+}
+
+// ——— 开始训练（跟练会话）———
+@Composable
+fun TrainingSessionScreen(nav: NavController, onBack: (() -> Unit)? = null) {
+    val context = LocalContext.current
+    val plansJson by Repo.settings.trainingPlansJson.collectAsStateWithLifecycle("[]")
+    val plans = parsePlans(plansJson)
+    val day = todayWeekday()
+    val acts = actionsForDay(plans, day)
+    val back = onBack ?: { nav.popBackStack() }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        AppTopBar("开始训练 · 周$day", showBack = true, onBack = back)
+        Spacer(Modifier.height(Dimen.s12))
+        if (acts.isEmpty()) {
+            EmptyState("今天没有安排训练，去添加或生成计划吧")
+        } else {
+            acts.forEachIndexed { i, a ->
+                AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s12)) {
+                    Text("${i + 1}. ${a.name}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("${a.muscle} · ${if (a.reps > 0) "${a.sets}组 × ${a.reps}次" else "${a.sets}组"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(Dimen.s8))
+                    Text(actionGuide(a), style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(Dimen.s8))
+                    TrainingVideoPlayer(a.videoUrl)
+                }
+            }
+            Spacer(Modifier.height(Dimen.s8))
+            PrimaryButton("完成训练 🎉", onClick = {
+                Toast.makeText(context, "训练完成，棒！", Toast.LENGTH_SHORT).show()
+                back()
+            }, modifier = Modifier.padding(horizontal = Dimen.s16), icon = Icons.Filled.Check)
+            Spacer(Modifier.height(Dimen.s24))
+        }
+    }
+}
+
+private fun actionGuide(a: TrainingAction): String = when (a.muscle) {
+    "胸" -> "沉肩夹紧肩胛，慢下快上，感受胸肌收缩。"
+    "背" -> "挺胸收腹，用背部发力带动手臂，避免耸肩。"
+    "腿" -> "膝盖对准脚尖，臀部后坐，核心收紧。"
+    "肩" -> "小重量控制，避免耸肩代偿。"
+    "三头" -> "大臂贴紧身体，仅小臂伸展。"
+    "二头" -> "肘部固定，靠二头发力弯举。"
+    "核心" -> "收紧腹部，保持呼吸均匀。"
+    else -> "控制节奏，注意呼吸：发力呼气、还原吸气。"
+}
+
+@Composable
+private fun TrainingVideoPlayer(url: String) {
+    if (url.isBlank()) {
+        Box(Modifier.fillMaxWidth().height(160.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Filled.PlayCircle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, Modifier.size(40.dp))
+                Spacer(Modifier.height(Dimen.s6))
+                Text("暂无跟练视频，按文字指导训练", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        return
+    }
+    AndroidView(factory = { ctx ->
+        android.widget.VideoView(ctx).apply {
+            layoutParams = android.view.ViewGroup.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+            try {
+                setVideoURI(android.net.Uri.parse(url))
+                setMediaController(android.widget.MediaController(ctx))
+                start()
+            } catch (_: Exception) { }
+        }
+    }, modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)))
 }

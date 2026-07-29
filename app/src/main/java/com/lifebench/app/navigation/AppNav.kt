@@ -88,7 +88,7 @@ fun AppNav() {
             // —— 四大主导航 ——
             composable(Routes.HOME, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { HomeScreen(nav) }
             composable(Routes.TOOLS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { ToolsHubScreen(nav) }
-            composable(Routes.FIT, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { FitHubScreen(nav) }
+            composable(Routes.FIT, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { FitnessScreen(nav) }
             composable(Routes.PROFILE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { ProfileScreen(nav) }
 
             // —— 生活工具子页 ——
@@ -105,6 +105,7 @@ fun AppNav() {
             composable(Routes.ACCOUNT, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { AccountScreen(nav) }
             composable(Routes.DIET, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { DietScreen(nav) }
             composable(Routes.FITNESS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { FitnessScreen(nav) }
+            composable(Routes.TRAINING, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { TrainingSessionScreen(nav) }
 
             // —— 舒尔特方格（唯一保留的训练模块）——
             composable(Routes.SCHULTE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { SchulteScreen(nav) }

@@ -25,6 +25,7 @@ object Routes {
     const val ACCOUNT = "account"
     const val DIET = "diet"
     const val FITNESS = "fitness"
+    const val TRAINING = "training"            // 开始训练（跟练会话）
 
     // —— 脑力训练 ——
     const val SCHULTE = "schulte"                 // 舒尔特方格（唯一保留的训练模块）

@@ -65,6 +65,10 @@ fun ToolsHubScreen(nav: NavController) {
         ToolEntry("随手笔记", Icons.Filled.Note, Routes.NOTE),
         ToolEntry("纪念日倒计时", Icons.Filled.Celebration, Routes.ANNIVERSARY),
         ToolEntry("习惯打卡", Icons.Filled.Repeat, Routes.HABIT),
+        ToolEntry("番茄钟专注", Icons.Filled.Alarm, Routes.FOCUS),
+        ToolEntry("睡眠记录", Icons.Filled.Bedtime, Routes.SLEEP),
+        ToolEntry("收支记账", Icons.Filled.AccountBalanceWallet, Routes.ACCOUNT),
+        ToolEntry("饮食菜谱", Icons.Filled.Restaurant, Routes.DIET),
         ToolEntry("全局设置", Icons.Filled.Settings, Routes.SETTINGS),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {

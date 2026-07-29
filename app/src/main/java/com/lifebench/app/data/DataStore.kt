@@ -64,6 +64,10 @@ class SettingsStore(private val context: Context) {
     val appLockEnabled: Flow<Boolean> = ds.data.map { it[KEY_LOCK] ?: false }
     suspend fun setAppLockEnabled(v: Boolean) = ds.edit { it[KEY_LOCK] = v }
 
+    // —— 训练计划（JSON 数组，存 TrainingPlan 列表，避免 Room 迁移）——
+    val trainingPlansJson: Flow<String> = ds.data.map { it[KEY_TRAIN_PLANS] ?: "[]" }
+    suspend fun setTrainingPlansJson(v: String) = ds.edit { it[KEY_TRAIN_PLANS] = v }
+
     // 一键清空（谨慎使用，仅导入覆盖前调用）
     suspend fun clearAll() = ds.edit { it.clear() }
 
@@ -78,5 +82,6 @@ class SettingsStore(private val context: Context) {
         private val KEY_PRESET = stringPreferencesKey("theme_preset")
         private val KEY_STEP_BASE = longPreferencesKey("step_baseline")
         private val KEY_LOCK = booleanPreferencesKey("app_lock")
+        private val KEY_TRAIN_PLANS = stringPreferencesKey("training_plans")
     }
 }
