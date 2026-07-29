@@ -638,7 +638,7 @@ private fun FitnessMainView(onAdd: () -> Unit, onGenerate: () -> Unit, onTrain: 
             }
             Box(Modifier.size(46.dp).background(BRAND_GREEN, CircleShape).clickable { showSheet = true },
                 contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Add, null, tint = Color(0xFF111418), Modifier.size(26.dp))
+                Icon(Icons.Filled.Add, null, Modifier.size(26.dp), tint = Color(0xFF111418))
             }
         }
         Spacer(Modifier.height(Dimen.s12))
@@ -730,7 +730,7 @@ private fun HeroCard(plans: List<TrainingPlan>, day: String, done: Int, total: I
                     Button(onClick = onTrain, modifier = Modifier.fillMaxWidth().height(44.dp),
                         shape = RoundedCornerShape(Dimen.btnRadius),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White)) {
-                        Icon(Icons.Filled.PlayArrow, null, tint = Color(0xFF111418), Modifier.size(20.dp))
+                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(20.dp), tint = Color(0xFF111418))
                         Spacer(Modifier.width(6.dp))
                         Text("开始训练", color = Color(0xFF111418), fontWeight = FontWeight.Bold)
                     }
@@ -778,7 +778,7 @@ private fun StatRow(plans: List<TrainingPlan>) {
 @Composable
 private fun StatCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
     AppCard(modifier) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, Modifier.size(20.dp))
+        Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(Dimen.s6))
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -998,7 +998,7 @@ private fun TrainingVideoPlayer(url: String) {
     if (url.isBlank()) {
         Box(Modifier.fillMaxWidth().height(160.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.PlayCircle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, Modifier.size(40.dp))
+                Icon(Icons.Filled.PlayCircle, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(Dimen.s6))
                 Text("暂无跟练视频，按文字指导训练", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
