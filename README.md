@@ -18,7 +18,7 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.3`（`versionCode 10303`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.4`（`versionCode 10304`）；包名 `com.lifebench.app`。
 
 ## 更新日志
 
@@ -37,10 +37,14 @@
 ### v1.3.3 (2026-07-30, patch)
 - **音效精简替换**
   - 移除原 5 个 mixkit 音效，改为 3 个用户指定音效（英文资源名，避免中文路径编码问题）：
-    - **`schulte_start`**：倒计时开始提示音（开始声音.mp3）。
+    - **`schulte_start`**：开始提示音（开始声音.mp3）。
     - **`schulte_correct`**：点中下一个数字（正确音效.mp3）。
     - **`schulte_wrong`**：点错数字（错误提示音.wav）。
-  - `SchulteAudio` 仅保留 `start()` / `correct()` / `wrong()` 三个方法；倒计时过程不再逐秒发声，仅在「开始」倒计时那一刻播放 `start()`。
+  - `SchulteAudio` 仅保留 `start()` / `correct()` / `wrong()` 三个方法；倒计时过程不再逐秒发声。
+
+### v1.3.4 (2026-07-30, patch)
+- **体验优化（舒尔特方格）**
+  - 开始提示音 `schulte_start` 的播放时机从「点开始按钮那一刻」调整为「倒计时 1 结束、数字方格呈现的同一刻」，音效与棋盘出现严格同步，更符合"开始"语义。
 
 ### v1.3.1 (2026-07-30, patch)
 - **Bug 修复**

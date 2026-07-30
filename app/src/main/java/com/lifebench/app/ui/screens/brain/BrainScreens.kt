@@ -97,10 +97,10 @@ fun SchulteScreen(nav: NavController) {
         reset()
         countdown = 3
         phase = "countdown"
-        audio.start() // 倒计时开始提示音（开始声音.mp3）
     }
 
-    // 倒计时驱动：countdown>0 时每秒 -1，归零后切到 running 并启动秒表
+    // 倒计时驱动：countdown>0 时每秒 -1，归零后切到 running 并启动秒表；
+    // 归零瞬间同步播放「开始」提示音并呈现方格，音效与棋盘出现严格同步。
     LaunchedEffect(phase, countdown) {
         if (phase != "countdown") return@LaunchedEffect
         if (countdown > 0) {
@@ -110,6 +110,7 @@ fun SchulteScreen(nav: NavController) {
             phase = "running"
             startTime = System.currentTimeMillis()
             elapsed = 0L
+            audio.start() // 倒计时 1 结束、方格呈现的那一刻播放开始音（开始声音.mp3）
         }
     }
 
