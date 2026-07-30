@@ -3,11 +3,13 @@ package com.lifebench.app.ui.screens.tools
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import com.lifebench.app.service.FocusService
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -169,6 +172,7 @@ fun FocusScreen(nav: NavController) {
 // ——— 睡眠记录 ———
 /** 睡眠质量文案/配色：0 未评 1 差 2 中 3 好。 */
 private fun qualityLabel(q: Int) = when (q) { 1 -> "差"; 2 -> "中"; 3 -> "好"; else -> "未评" }
+@Composable
 private fun qualityColor(q: Int) = when (q) {
     1 -> MaterialTheme.colorScheme.error
     2 -> MaterialTheme.colorScheme.tertiary
@@ -415,14 +419,20 @@ fun SleepScreen(nav: NavController) {
 
         // —— 建议（按档位高亮）——
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            val (icon, tint, bg) = remember(recent) {
+            val level = remember(recent) {
                 val s = CalcUtil.sleepSuggestion(recent)
                 when {
-                    s.contains("偏少") -> Triple(Icons.Filled.Warning, MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.errorContainer)
-                    s.contains("波动") -> Triple(Icons.Filled.Sync, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.tertiaryContainer)
-                    s.contains("偏多") -> Triple(Icons.Filled.Info, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
-                    else -> Triple(Icons.Filled.CheckCircle, LocalExtraColors.current.success, LocalExtraColors.current.success.copy(alpha = 0.12f))
+                    s.contains("偏少") -> "少"
+                    s.contains("波动") -> "波动"
+                    s.contains("偏多") -> "多"
+                    else -> "好"
                 }
+            }
+            val (icon, tint, bg) = when (level) {
+                "少" -> Triple(Icons.Filled.Warning, MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.errorContainer)
+                "波动" -> Triple(Icons.Filled.Sync, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.tertiaryContainer)
+                "多" -> Triple(Icons.Filled.Info, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
+                else -> Triple(Icons.Filled.CheckCircle, LocalExtraColors.current.success, LocalExtraColors.current.success.copy(alpha = 0.12f))
             }
             Text("睡眠改善建议", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
