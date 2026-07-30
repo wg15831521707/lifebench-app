@@ -2,6 +2,7 @@ package com.lifebench.app.util
 
 import android.content.Context
 import android.media.MediaPlayer
+import com.lifebench.app.R
 
 /**
  * 番茄钟背景白噪音播放器。
