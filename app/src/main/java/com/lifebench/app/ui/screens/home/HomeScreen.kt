@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,7 @@ import com.lifebench.app.ui.components.AppCard
 import com.lifebench.app.ui.components.AppTopBar
 import com.lifebench.app.ui.components.ConfirmDeleteDialog
 import com.lifebench.app.ui.components.MetricLine
+import com.lifebench.app.ui.components.chipTint
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.ThemeMode
 import com.lifebench.app.util.CalcUtil
@@ -250,7 +252,17 @@ fun HomeScreen(nav: NavController) {
         }
 
         Spacer(Modifier.height(Dimen.s16))
-        Text("  快捷入口", style = MaterialTheme.typography.titleMedium,
+        // 快捷跳转：两大枢纽
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
+            horizontalArrangement = Arrangement.spacedBy(Dimen.s12)
+        ) {
+            HubShortcut("专注空间", Icons.Filled.Spa, "番茄钟 · 睡眠 · 饮食 · 习惯", Routes.FOCUS_HUB, nav, Modifier.weight(1f), 0)
+            HubShortcut("工具箱", Icons.Filled.Widgets, "待办 · 记账 · 笔记 · 更多", Routes.TOOLS, nav, Modifier.weight(1f), 1)
+        }
+
+        Spacer(Modifier.height(Dimen.s16))
+        Text("  全部工具", style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = Dimen.s16))
 
         Spacer(Modifier.height(Dimen.s8))
@@ -262,17 +274,18 @@ fun HomeScreen(nav: NavController) {
         ) {
             items(quickEntries.size) { i ->
                 val e = quickEntries[i]
+                val (c, t) = chipTint(i)
                 Column(
                     Modifier.clickable { nav.navigate(e.route) }.padding(Dimen.s8),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Surface(
                         shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = c,
                         modifier = Modifier.size(48.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(e.icon, contentDescription = e.label, tint = MaterialTheme.colorScheme.primary)
+                            Icon(e.icon, contentDescription = e.label, tint = t)
                         }
                     }
                     Spacer(Modifier.height(4.dp))
@@ -402,6 +415,28 @@ private data class QuadrantInfo(
     val accent: Color,
     val text: Color
 )
+
+/** 首页枢纽快捷卡：大图标芯片 + 标题 + 副标题，一键进入对应主导航。 */
+@Composable
+private fun HubShortcut(
+    label: String, icon: ImageVector, desc: String, route: String,
+    nav: NavController, modifier: Modifier = Modifier, accent: Int
+) {
+    val (c, t) = chipTint(accent)
+    AppCard(modifier = modifier, onClick = { nav.navigate(route) }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = RoundedCornerShape(12.dp), color = c, modifier = Modifier.size(44.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = t, modifier = Modifier.size(24.dp)) }
+            }
+            Spacer(Modifier.width(Dimen.s12))
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
 
 private data class Quick(val label: String, val icon: ImageVector, val route: String)
 private val quickEntries = listOf(

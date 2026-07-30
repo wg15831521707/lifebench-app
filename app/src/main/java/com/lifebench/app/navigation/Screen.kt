@@ -5,8 +5,9 @@ package com.lifebench.app.navigation
  * 底部三大主导航 + 各子页面；带参路由用路由模板字符串（参数以 {name} 占位）。
  */
 object Routes {
-    // —— 三大主导航（底部导航栏）——
+    // —— 四大主导航（底部导航栏）——
     const val HOME = "home"
+    const val FOCUS_HUB = "focus_hub"   // 专注枢纽（番茄钟/睡眠/饮食/习惯）
     const val TOOLS = "tools"
     const val PROFILE = "profile"
 

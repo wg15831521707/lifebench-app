@@ -16,6 +16,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.item
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -55,40 +62,156 @@ import androidx.activity.result.contract.ActivityResultContracts
  * ===== 生活工具专区：枢纽 + 待办/密码/笔记/纪念日/设置 =====
  */
 
-// ——— 工具枢纽 ———
+// ——— 工具枢纽（重设计：分类双列网格）———
+private data class ToolMeta(
+    val label: String,
+    val desc: String,
+    val icon: ImageVector,
+    val route: String,
+    val accent: Int,
+)
+
+/** 区块标题（带语义色小图标）。 */
 @Composable
-fun ToolsHubScreen(nav: NavController) {
-    val entries = listOf(
-        ToolEntry("待办备忘录", Icons.Filled.Checklist, Routes.TODO),
-        ToolEntry("舒尔特方格", Icons.Filled.GridOn, Routes.SCHULTE),
-        ToolEntry("密码保险箱", Icons.Filled.Lock, Routes.PASSWORD),
-        ToolEntry("随手笔记", Icons.Filled.Note, Routes.NOTE),
-        ToolEntry("纪念日倒计时", Icons.Filled.Celebration, Routes.ANNIVERSARY),
-        ToolEntry("习惯打卡", Icons.Filled.Repeat, Routes.HABIT),
-        ToolEntry("番茄钟专注", Icons.Filled.Alarm, Routes.FOCUS),
-        ToolEntry("睡眠记录", Icons.Filled.Bedtime, Routes.SLEEP),
-        ToolEntry("收支记账", Icons.Filled.AccountBalanceWallet, Routes.ACCOUNT),
-        ToolEntry("饮食菜谱", Icons.Filled.Restaurant, Routes.DIET),
-        ToolEntry("全局设置", Icons.Filled.Settings, Routes.SETTINGS),
-    )
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AppTopBar("生活工具")
-        Spacer(Modifier.height(Dimen.s12))
-        entries.forEach { e ->
-            AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s12), onClick = { nav.navigate(e.route) }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(e.icon, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(Dimen.s12))
-                    Text(e.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        Spacer(Modifier.height(Dimen.s24))
+private fun HubSectionHeader(text: String, icon: ImageVector) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = Dimen.s4)
+    ) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(Dimen.s6))
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
-private data class ToolEntry(val label: String, val icon: ImageVector, val route: String)
+/** 工具卡片：语义色图标芯片 + 标题 + 一句说明 + 右箭头，双列等宽。 */
+@Composable
+private fun ToolTile(meta: ToolMeta, onClick: () -> Unit) {
+    val (container, tint) = chipTint(meta.accent)
+    AppCard(onClick = onClick) {
+        Surface(
+            shape = RoundedCornerShape(12.dp), color = container,
+            modifier = Modifier.size(44.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) { Icon(meta.icon, null, tint = tint, modifier = Modifier.size(24.dp)) }
+        }
+        Spacer(Modifier.height(Dimen.s10))
+        Text(meta.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            meta.desc, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(Dimen.s8))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+fun ToolsHubScreen(nav: NavController) {
+    val efficiency = listOf(
+        ToolMeta("待办备忘录", "四象限，分清轻重缓急", Icons.Filled.Checklist, Routes.TODO, 0),
+        ToolMeta("收支记账", "随手记，掌控每一笔", Icons.Filled.AccountBalanceWallet, Routes.ACCOUNT, 1),
+        ToolMeta("舒尔特方格", "训练专注力与反应", Icons.Filled.GridOn, Routes.SCHULTE, 2),
+    )
+    val safety = listOf(
+        ToolMeta("密码保险箱", "加密保管账号密码", Icons.Filled.Lock, Routes.PASSWORD, 3),
+        ToolMeta("随手笔记", "灵感随时记录", Icons.Filled.Note, Routes.NOTE, 0),
+        ToolMeta("纪念日倒计时", "重要日子不错过", Icons.Filled.Celebration, Routes.ANNIVERSARY, 1),
+    )
+    Scaffold(topBar = { AppTopBar("工具") }) { pad ->
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize().padding(pad).padding(horizontal = Dimen.s16),
+            verticalArrangement = Arrangement.spacedBy(Dimen.s12),
+            horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
+            contentPadding = PaddingValues(vertical = Dimen.s12)
+        ) {
+            item(span = { GridItemSpan(2) }) { HubSectionHeader("效率工具", Icons.Filled.FlashOn) }
+            items(efficiency) { ToolTile(it) { nav.navigate(it.route) } }
+            item(span = { GridItemSpan(2) }) { HubSectionHeader("安全与记录", Icons.Filled.VerifiedUser) }
+            items(safety) { ToolTile(it) { nav.navigate(it.route) } }
+        }
+    }
+}
+
+// ——— 专注枢纽（番茄钟 / 睡眠 / 饮食 / 习惯，含实时状态）———
+private data class FocusMeta(
+    val label: String,
+    val icon: ImageVector,
+    val route: String,
+    val accent: Int,
+)
+
+private fun fmtSleep(min: Int): String {
+    val h = min / 60; val m = min % 60
+    return if (h > 0) "${h}h${m}m" else "${m}m"
+}
+
+@Composable
+fun FocusHubScreen(nav: NavController) {
+    var focusMin by remember { mutableStateOf(0) }
+    val recentSleep by Repo.sleep.observeRecent().collectAsStateWithLifecycle(emptyList())
+    val diets by Repo.diet.observeByDate(TimeUtil.dayKey()).collectAsStateWithLifecycle(emptyList())
+    val habits by Repo.habit.observeActiveHabits().collectAsStateWithLifecycle(emptyList())
+    val checkIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
+    val todayKey = TimeUtil.dayKey()
+    val todayChecked = checkIns.count { it.date == todayKey }
+    LaunchedEffect(Unit) {
+        focusMin = Repo.focus.focusMinutesBetween(TimeUtil.dayKey(), System.currentTimeMillis())
+    }
+    val sleepMin = recentSleep.firstOrNull()?.durationMin ?: 0
+    val metas = listOf(
+        FocusMeta("番茄钟", Icons.Filled.Alarm, Routes.FOCUS, 0),
+        FocusMeta("睡眠记录", Icons.Filled.Bedtime, Routes.SLEEP, 2),
+        FocusMeta("饮食菜谱", Icons.Filled.Restaurant, Routes.DIET, 1),
+        FocusMeta("习惯打卡", Icons.Filled.Repeat, Routes.HABIT, 3),
+    )
+    Scaffold(topBar = { AppTopBar("专注") }) { pad ->
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize().padding(pad).padding(horizontal = Dimen.s16),
+            verticalArrangement = Arrangement.spacedBy(Dimen.s12),
+            horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
+            contentPadding = PaddingValues(vertical = Dimen.s12)
+        ) {
+            item(span = { GridItemSpan(2) }) { HubSectionHeader("今日状态", Icons.Filled.Insights) }
+            item { FocusStatCard(metas[0], "${focusMin} 分", "今日专注时长", nav) }
+            item { FocusStatCard(metas[1], fmtSleep(sleepMin), "昨晚睡眠", nav) }
+            item { FocusStatCard(metas[2], "${diets.size} 餐", "今日已记录", nav) }
+            item { FocusStatCard(metas[3], "$todayChecked/${habits.size}", "今日打卡", nav) }
+            item(span = { GridItemSpan(2) }) {
+                PrimaryButton("开始一次专注", onClick = { nav.navigate(Routes.FOCUS) }, icon = Icons.Filled.PlayArrow)
+            }
+        }
+    }
+}
+
+/** 专注状态卡：图标芯片 + 实时数值 + 标签 + 右箭头，点按进入对应子页。 */
+@Composable
+private fun FocusStatCard(meta: FocusMeta, value: String, sub: String, nav: NavController) {
+    val (container, tint) = chipTint(meta.accent)
+    AppCard(onClick = { nav.navigate(meta.route) }) {
+        Surface(
+            shape = RoundedCornerShape(12.dp), color = container,
+            modifier = Modifier.size(44.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) { Icon(meta.icon, null, tint = tint, modifier = Modifier.size(24.dp)) }
+        }
+        Spacer(Modifier.height(Dimen.s10))
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(Dimen.s6))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(meta.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+        }
+    }
+}
 
 // ——— 待办备忘录（科维四象限）———
 private val QUADRANT_LABELS = listOf("重要且紧急", "重要不紧急", "紧急不重要", "不重要不紧急")

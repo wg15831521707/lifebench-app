@@ -21,8 +21,8 @@ import com.lifebench.app.ui.screens.profile.ProfileScreen
 import com.lifebench.app.ui.screens.tools.*
 
 /**
- * 全局导航：底部三大主导航 + 各子页面路由注册。
- * - 三大主导航（首页/工具/我的）在 NavBar 切换，单栈避免重复入栈。
+ * 全局导航：底部四大主导航 + 各子页面路由注册。
+ * - 四大主导航（首页/专注/工具/我的）在 NavBar 切换，单栈避免重复入栈。
  * - 子页面通过顶栏返回键 popBackStack 回到所属枢纽。
  * - 仅在顶级路由显示底部导航栏，进入子页自动隐藏，保证沉浸与空间。
  * - 选中态只改变图标/文字颜色，不显示背景色块，视觉反馈更深。
@@ -86,6 +86,7 @@ fun AppNav() {
         ) {
             // —— 四大主导航 ——
             composable(Routes.HOME, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { HomeScreen(nav) }
+            composable(Routes.FOCUS_HUB, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { FocusHubScreen(nav) }
             composable(Routes.TOOLS, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { ToolsHubScreen(nav) }
             composable(Routes.PROFILE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { ProfileScreen(nav) }
 

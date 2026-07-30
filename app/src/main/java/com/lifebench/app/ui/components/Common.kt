@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lifebench.app.ui.theme.Dimen
+import com.lifebench.app.ui.theme.LocalExtraColors
 
 /**
  * 通用 UI 组件库：统一卡片、按钮、顶栏、空状态、加载，保证全局视觉一致。
@@ -175,4 +176,19 @@ fun ConfirmDeleteDialog(
         },
         dismissButton = { TextButton(onDismiss) { Text("取消") } }
     )
+}
+
+/**
+ * 工具/专注卡片图标芯片的循环配色：用已定义的语义色（主色 + success/warning + error 容器）叠加透明度，
+ * 避免引用主题未定义的 tertiary/secondaryContainer 槽位（会回退成 Material 默认紫，破坏 teal 主色一致性）。
+ * index 决定配色，保证同种工具颜色稳定。
+ */
+fun chipTint(index: Int): Pair<Color, Color> {
+    val ex = LocalExtraColors.current
+    return when (((index % 4) + 4) % 4) {
+        0 -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+        1 -> ex.success.copy(alpha = 0.16f) to ex.success
+        2 -> ex.warning.copy(alpha = 0.18f) to ex.warning
+        else -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.error
+    }
 }
