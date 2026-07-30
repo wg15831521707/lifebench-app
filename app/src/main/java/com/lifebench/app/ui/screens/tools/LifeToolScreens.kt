@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.viewinterop.AndroidView
 
 
+@Composable
 fun FocusScreen(nav: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

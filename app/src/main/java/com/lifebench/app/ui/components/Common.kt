@@ -183,6 +183,7 @@ fun ConfirmDeleteDialog(
  * 避免引用主题未定义的 tertiary/secondaryContainer 槽位（会回退成 Material 默认紫，破坏 teal 主色一致性）。
  * index 决定配色，保证同种工具颜色稳定。
  */
+@Composable
 fun chipTint(index: Int): Pair<Color, Color> {
     val ex = LocalExtraColors.current
     return when (((index % 4) + 4) % 4) {
