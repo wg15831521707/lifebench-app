@@ -71,7 +71,7 @@ fun ProfileScreen(nav: NavController) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Settings, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(Dimen.s12))
-                Text("全局设置（主题/字体/通知/预算）", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text("全局设置", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

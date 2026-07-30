@@ -659,7 +659,7 @@ fun SettingsScreen(nav: NavController) {
         }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("月度消费预算")
+            Text("月度消费预算（元）")
             var bText by remember { mutableStateOf(formatBudget(budget)) }
             LaunchedEffect(budget) { bText = formatBudget(budget) }
             OutlinedTextField(bText, { bText = it }, modifier = Modifier.fillMaxWidth(), singleLine = true)
