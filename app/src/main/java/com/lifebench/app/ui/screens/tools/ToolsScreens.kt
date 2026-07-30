@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.item
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.rememberScrollState
@@ -95,7 +94,7 @@ private fun ToolTile(meta: ToolMeta, onClick: () -> Unit) {
         ) {
             Box(contentAlignment = Alignment.Center) { Icon(meta.icon, null, tint = tint, modifier = Modifier.size(24.dp)) }
         }
-        Spacer(Modifier.height(Dimen.s10))
+        Spacer(Modifier.height(Dimen.s8))
         Text(meta.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(2.dp))
         Text(
@@ -130,9 +129,9 @@ fun ToolsHubScreen(nav: NavController) {
             horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
             contentPadding = PaddingValues(vertical = Dimen.s12)
         ) {
-            item(span = { GridItemSpan(2) }) { HubSectionHeader("效率工具", Icons.Filled.FlashOn) }
+            items(1, span = { GridItemSpan(2) }) { HubSectionHeader("效率工具", Icons.Filled.FlashOn) }
             items(efficiency) { ToolTile(it) { nav.navigate(it.route) } }
-            item(span = { GridItemSpan(2) }) { HubSectionHeader("安全与记录", Icons.Filled.VerifiedUser) }
+            items(1, span = { GridItemSpan(2) }) { HubSectionHeader("安全与记录", Icons.Filled.VerifiedUser) }
             items(safety) { ToolTile(it) { nav.navigate(it.route) } }
         }
     }
@@ -178,12 +177,12 @@ fun FocusHubScreen(nav: NavController) {
             horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
             contentPadding = PaddingValues(vertical = Dimen.s12)
         ) {
-            item(span = { GridItemSpan(2) }) { HubSectionHeader("今日状态", Icons.Filled.Insights) }
-            item { FocusStatCard(metas[0], "${focusMin} 分", "今日专注时长", nav) }
-            item { FocusStatCard(metas[1], fmtSleep(sleepMin), "昨晚睡眠", nav) }
-            item { FocusStatCard(metas[2], "${diets.size} 餐", "今日已记录", nav) }
-            item { FocusStatCard(metas[3], "$todayChecked/${habits.size}", "今日打卡", nav) }
-            item(span = { GridItemSpan(2) }) {
+            items(1, span = { GridItemSpan(2) }) { HubSectionHeader("今日状态", Icons.Filled.Insights) }
+            items(1) { FocusStatCard(metas[0], "${focusMin} 分", "今日专注时长", nav) }
+            items(1) { FocusStatCard(metas[1], fmtSleep(sleepMin), "昨晚睡眠", nav) }
+            items(1) { FocusStatCard(metas[2], "${diets.size} 餐", "今日已记录", nav) }
+            items(1) { FocusStatCard(metas[3], "$todayChecked/${habits.size}", "今日打卡", nav) }
+            items(1, span = { GridItemSpan(2) }) {
                 PrimaryButton("开始一次专注", onClick = { nav.navigate(Routes.FOCUS) }, icon = Icons.Filled.PlayArrow)
             }
         }
@@ -201,7 +200,7 @@ private fun FocusStatCard(meta: FocusMeta, value: String, sub: String, nav: NavC
         ) {
             Box(contentAlignment = Alignment.Center) { Icon(meta.icon, null, tint = tint, modifier = Modifier.size(24.dp)) }
         }
-        Spacer(Modifier.height(Dimen.s10))
+        Spacer(Modifier.height(Dimen.s8))
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(Dimen.s6))
@@ -241,7 +240,7 @@ fun TodoScreen(nav: NavController) {
                     for (q in 0..3) {
                         val qs = list.filter { it.quadrant == q }
                         if (qs.isNotEmpty()) {
-                            item { QuadrantSectionHeader(q) }
+                            items(1) { QuadrantSectionHeader(q) }
                             items(qs, key = { it.id }) { item ->
                                 TodoRow(item,
                                     onToggle = { scope.launch { Repo.todo.update(item.copy(done = it, archived = it)) } },
@@ -250,7 +249,7 @@ fun TodoScreen(nav: NavController) {
                             }
                         }
                     }
-                    if (list.isEmpty()) item { EmptyState("暂无进行中的待办，点 + 添加") }
+                    if (list.isEmpty()) items(1) { EmptyState("暂无进行中的待办，点 + 添加") }
                 } else {
                     items(list, key = { it.id }) { item ->
                         TodoRow(item,
@@ -258,7 +257,7 @@ fun TodoScreen(nav: NavController) {
                             onEdit = { editItem = item },
                             onDelete = { scope.launch { Repo.todo.delete(item); AlarmScheduler.cancel(context, item.id.toInt()) } })
                     }
-                    if (list.isEmpty()) item { EmptyState("暂无已完成事项") }
+                    if (list.isEmpty()) items(1) { EmptyState("暂无已完成事项") }
                 }
             }
         }
@@ -391,7 +390,7 @@ fun PasswordScreen(nav: NavController) {
         floatingActionButton = { AddFloating { showAdd = true } }
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
-            item {
+            items(1) {
                 AppCard(Modifier.padding(bottom = Dimen.s12)) {
                     MetricLine(icon = Icons.Filled.Lock, label = "密码条目", value = "${items.size} 条")
                 }
@@ -415,7 +414,7 @@ fun PasswordScreen(nav: NavController) {
                 }
                 if (showDel) ConfirmDeleteDialog(message = "确定删除密码条目「${p.title}」吗？", onDismiss = { showDel = false }) { scope.launch { Repo.password.delete(p) } }
             }
-            if (items.isEmpty()) item { EmptyState("还没有密码条目，点击 + 添加") }
+            if (items.isEmpty()) items(1) { EmptyState("还没有密码条目，点击 + 添加") }
         }
     }
     if (showAdd) PasswordAddDialog(onDismiss = { showAdd = false }, onSave = { g, t, a, pw, n ->
@@ -461,7 +460,7 @@ fun NoteScreen(nav: NavController) {
         floatingActionButton = { AddFloating { showAdd = true } }
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
-            item {
+            items(1) {
                 AppCard(Modifier.padding(bottom = Dimen.s12)) {
                     MetricLine(icon = Icons.Filled.Note, label = "笔记数量", value = "${items.size} 篇")
                 }
@@ -473,7 +472,7 @@ fun NoteScreen(nav: NavController) {
                     Text("分类：${n.category} · ${TimeUtil.formatHM(n.updatedAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (items.isEmpty()) item { EmptyState("还没有笔记，记一笔吧") }
+            if (items.isEmpty()) items(1) { EmptyState("还没有笔记，记一笔吧") }
         }
     }
     if (showAdd || edit != null) NoteEditDialog(initial = edit, onDismiss = { showAdd=false; edit=null }, onSave = { title, content, cat ->
@@ -519,7 +518,7 @@ fun AnniversaryScreen(nav: NavController) {
         floatingActionButton = { AddFloating { showAdd = true } }
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
-            item {
+            items(1) {
                 AppCard(Modifier.padding(bottom = Dimen.s12)) {
                     MetricLine(icon = Icons.Filled.Celebration, label = "纪念日", value = "${items.size} 个", valueColor = MaterialTheme.colorScheme.primary)
                 }
@@ -543,7 +542,7 @@ fun AnniversaryScreen(nav: NavController) {
                 }
                 if (showDel) ConfirmDeleteDialog(message = "确定删除纪念日「${a.name}」吗？", onDismiss = { showDel = false }) { scope.launch { Repo.anniversary.delete(a); AlarmScheduler.cancel(context, a.id.toInt()) } }
             }
-            if (items.isEmpty()) item { EmptyState("添加重要的日子，准时提醒") }
+            if (items.isEmpty()) items(1) { EmptyState("添加重要的日子，准时提醒") }
         }
     }
     if (showAdd) AnniversaryAddDialog(onDismiss = { showAdd = false }, onSave = { name, date, yearly, icon ->
