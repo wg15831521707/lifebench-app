@@ -97,7 +97,7 @@ fun SchulteScreen(nav: NavController) {
         reset()
         countdown = 3
         phase = "countdown"
-        audio.tick() // 启动 3-2-1 倒数铃
+        audio.start() // 倒计时开始提示音（开始声音.mp3）
     }
 
     // 倒计时驱动：countdown>0 时每秒 -1，归零后切到 running 并启动秒表
@@ -110,7 +110,6 @@ fun SchulteScreen(nav: NavController) {
             phase = "running"
             startTime = System.currentTimeMillis()
             elapsed = 0L
-            audio.go() // 倒数归零，"go" 提示游戏开始
         }
     }
 
@@ -132,7 +131,6 @@ fun SchulteScreen(nav: NavController) {
         val r = SchulteResultEntity(size = size, timeMs = elapsed, errors = errors, efficiency = 0f, mode = mode)
         finished = r
         scope.launch { Repo.schulte.insert(r) }
-        audio.complete()
     }
 
     /** 取消/放弃：倒计时或 running 阶段都可触发；不写记录、不算最佳、不弹报告。 */
