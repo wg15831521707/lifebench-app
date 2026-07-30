@@ -410,7 +410,6 @@ private val quickEntries = listOf(
     Quick("记账", Icons.Filled.AccountBalanceWallet, Routes.ACCOUNT),
     Quick("睡眠", Icons.Filled.Bedtime, Routes.SLEEP),
     Quick("饮食", Icons.Filled.Restaurant, Routes.DIET),
-    Quick("健身", Icons.Filled.FitnessCenter, Routes.FITNESS),
     Quick("舒尔特", Icons.Filled.GridView, Routes.SCHULTE),
     Quick("笔记", Icons.Filled.Note, Routes.NOTE),
     Quick("密码箱", Icons.Filled.Lock, Routes.PASSWORD),
