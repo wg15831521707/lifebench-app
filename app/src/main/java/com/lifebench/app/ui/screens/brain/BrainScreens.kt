@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.lifebench.app.audio.SchulteAudio
 import com.lifebench.app.data.Repo
 import com.lifebench.app.data.entity.SchulteResultEntity
 import com.lifebench.app.ui.components.*
@@ -45,7 +46,7 @@ fun SchulteScreen(nav: NavController) {
     var size by remember { mutableStateOf(5) }
     var mode by remember { mutableStateOf("继续") }       // 中断 / 继续
     var numbers by remember { mutableStateOf((1..size * size).toList()) }
-    // 4 色循环（默认/绿/红/teal），与数字位置同步洗牌，强化训练辨识又不杂乱
+    // 4 色循环（黑/红/蓝/橙），与数字位置同步洗牌；防相邻同色，强化训练辨识又不杂乱
     var cellColors by remember { mutableStateOf<List<Color>>(emptyList()) }
     var phase by remember { mutableStateOf("idle") }       // idle | countdown | running | done
     var countdown by remember { mutableStateOf(0) }        // 3 → 2 → 1
@@ -59,18 +60,28 @@ fun SchulteScreen(nav: NavController) {
     val history by Repo.schulte.observeAll().collectAsStateWithLifecycle(emptyList())
 
     val palette = listOf(
-        Color(0xFF1F2426),  // 默认（onSurface 黑）
-        Color(0xFF6BBF73),  // 绿 - SuccessLight
-        Color(0xFFD8695F),  // 红 - ErrorLight
-        Color(0xFF1A9C84),  // teal - PrimaryLight（设计系统主色）
+        Color(0xFF1A1A1A),  // 1 黑：默认（最强对比）
+        Color(0xFFE74C3C),  // 2 亮红：警示
+        Color(0xFF2E86DE),  // 3 亮蓝：冷静
+        Color(0xFFF39C12),  // 4 橙黄：醒目
     )
+
+    val context = LocalContext.current
+    val audio = remember { SchulteAudio(context) }
+    DisposableEffect(Unit) { onDispose { audio.release() } }
 
     /** 重置本局：重新洗牌、归零计时与计数、刷新颜色。 */
     fun reset() {
         val ns = (1..size * size).toList().shuffled()
         numbers = ns
-        // 错落分配（步长 7 与 3 错开，避免连续同色），保证每盘看起来新但不会全同色
-        cellColors = List(ns.size) { palette[(it * 7 + 3) % 4] }
+        // 防相邻同色分布：每个 cell 从 palette 中排除"上一格颜色"后随机选，4 色轮换足够随机
+        val colors = mutableListOf<Color>()
+        repeat(ns.size) { i ->
+            val last = colors.lastOrNull()
+            val pool = palette.filter { it != last }
+            colors.add(pool.random())
+        }
+        cellColors = colors
         phase = "idle"
         countdown = 0
         expected = 1
@@ -86,6 +97,7 @@ fun SchulteScreen(nav: NavController) {
         reset()
         countdown = 3
         phase = "countdown"
+        audio.tick() // 启动 3-2-1 倒数铃
     }
 
     // 倒计时驱动：countdown>0 时每秒 -1，归零后切到 running 并启动秒表
@@ -98,6 +110,7 @@ fun SchulteScreen(nav: NavController) {
             phase = "running"
             startTime = System.currentTimeMillis()
             elapsed = 0L
+            audio.go() // 倒数归零，"go" 提示游戏开始
         }
     }
 
@@ -119,6 +132,7 @@ fun SchulteScreen(nav: NavController) {
         val r = SchulteResultEntity(size = size, timeMs = elapsed, errors = errors, efficiency = 0f, mode = mode)
         finished = r
         scope.launch { Repo.schulte.insert(r) }
+        audio.complete()
     }
 
     /** 取消/放弃：倒计时或 running 阶段都可触发；不写记录、不算最佳、不弹报告。 */
@@ -138,9 +152,11 @@ fun SchulteScreen(nav: NavController) {
         if (v == expected) {
             lastClicked = v
             expected++
+            audio.correct()
             if (expected > size * size) complete()
         } else {
             errors++
+            audio.wrong()
             if (mode == "中断") complete()
         }
     }

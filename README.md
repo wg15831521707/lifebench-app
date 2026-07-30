@@ -18,9 +18,21 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.1`（`versionCode 10301`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.2`（`versionCode 10302`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.3.2 (2026-07-30, patch)
+- **Bug 修复**
+  - 舒尔特方格 8×8 数字颜色：调色板从「黑/绿/红/teal」（绿与 teal 色相过近）改为「黑/红/蓝/橙」（色相四向分散），并在 `reset()` 用防相邻同色分布（每格从「排除上一格颜色」的子集随机），8×8 等小格内也一眼能区分。
+- **优化**
+  - 舒尔特方格 SFX（新增 `app/src/main/java/com/lifebench/app/audio/SchulteAudio.kt`，SoundPool 驱动 4 路并发）：
+    - **倒计时（3,2,1）**：3 声柔和钟铃（Soft bell countdown, mixkit.co, 0:03）
+    - **开始**：3 声「go」蜂鸣（Sport start bleeps, mixkit.co, 0:03）
+    - **点对**：清脆正向提示（Correct answer fast notification, mixkit.co, 0:01）
+    - **点错**：低频错误蜂鸣（Game show wrong answer buzz, mixkit.co, 0:01）
+    - **完成**：胜利叮（Quick win video game notification, mixkit.co, 0:01）
+    - 资源来自 [mixkit.co](https://mixkit.co/license/#sfxFree)（CC0 自由使用，无需署名）；5 个 MP3 落入 `res/raw/`，总 ~800KB。
 
 ### v1.3.1 (2026-07-30, patch)
 - **Bug 修复**
