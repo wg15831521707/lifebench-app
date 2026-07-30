@@ -150,6 +150,10 @@ private fun fmtSleep(min: Int): String {
     return if (h > 0) "${h}h${m}m" else "${m}m"
 }
 
+/** 预算金额展示：整数去小数（如 2000），非整数保留两位（如 1999.5）。 */
+private fun formatBudget(v: Double): String =
+    if (v % 1.0 == 0.0) v.toLong().toString() else "%.2f".format(v)
+
 @Composable
 fun FocusHubScreen(nav: NavController) {
     var focusMin by remember { mutableStateOf(0) }
@@ -585,7 +589,7 @@ fun SettingsScreen(nav: NavController) {
     val context = LocalContext.current
     val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
     val fontScale by Repo.settings.fontScale.collectAsStateWithLifecycle(1.0f)
-    val presetId by Repo.settings.themePreset.collectAsStateWithLifecycle("teal")
+    val presetId by Repo.settings.themePreset.collectAsStateWithLifecycle("pink")
     val notify by Repo.settings.notificationEnabled.collectAsStateWithLifecycle(true)
     val sound by Repo.settings.soundEnabled.collectAsStateWithLifecycle(true)
     val budget by Repo.settings.monthlyBudget.collectAsStateWithLifecycle(2000.0)
@@ -655,8 +659,9 @@ fun SettingsScreen(nav: NavController) {
         }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("月度消费预算（元）")
-            var bText by remember { mutableStateOf(budget.toString()) }
+            Text("月度消费预算")
+            var bText by remember { mutableStateOf(formatBudget(budget)) }
+            LaunchedEffect(budget) { bText = formatBudget(budget) }
             OutlinedTextField(bText, { bText = it }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             Button(onClick = { bText.toDoubleOrNull()?.let { scope.launch { Repo.settings.setMonthlyBudget(it) }; Toast.makeText(context, "已保存", Toast.LENGTH_SHORT).show() } }) { Text("保存预算") }
         }

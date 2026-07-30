@@ -20,8 +20,8 @@ class SettingsStore(private val context: Context) {
     val themeMode: Flow<String> = ds.data.map { it[KEY_THEME] ?: "SYSTEM" }
     suspend fun setThemeMode(v: String) = ds.edit { it[KEY_THEME] = v }
 
-    // —— 主题色彩预设 id（teal/blue/green/orange/pink/purple）——
-    val themePreset: Flow<String> = ds.data.map { it[KEY_PRESET] ?: "teal" }
+    // —— 主题色彩预设 id（pink/teal/blue/green/orange/purple）——
+    val themePreset: Flow<String> = ds.data.map { it[KEY_PRESET] ?: "pink" }
     suspend fun setThemePreset(v: String) = ds.edit { it[KEY_PRESET] = v }
 
     // —— 字体缩放 0.85~1.3 ——
@@ -36,7 +36,8 @@ class SettingsStore(private val context: Context) {
     val soundEnabled: Flow<Boolean> = ds.data.map { it[KEY_SOUND] ?: true }
     suspend fun setSoundEnabled(v: Boolean) = ds.edit { it[KEY_SOUND] = v }
 
-    // —— 番茄钟白噪音选择（无/雨声/森林/海浪/咖啡馆）——
+    // —— 番茄钟白噪音选择（无/火炉白噪音）——
+    // 实际音频为 res/raw/fireplace.mp3，由 WhiteNoisePlayer 播放。后续新增见 WhiteNoisePlayer.PRESET_RES。
     val whiteNoise: Flow<String> = ds.data.map { it[KEY_NOISE] ?: "无" }
     suspend fun setWhiteNoise(v: String) = ds.edit { it[KEY_NOISE] = v }
 

@@ -138,10 +138,10 @@ fun FocusScreen(nav: NavController) {
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("白噪音背景音", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
-            FlowRow(Modifier.fillMaxWidth()) { listOf("无", "雨声", "森林", "海浪", "咖啡馆").forEach { n ->
-                FilterChip(selected = noise == n, onClick = { noise = n; WhiteNoisePlayer.play(n); scope.launch { Repo.settings.setWhiteNoise(n) } }, label = { Text(n) }, modifier = Modifier.padding(end = 4.dp, bottom = 4.dp))
+            FlowRow(Modifier.fillMaxWidth()) { listOf("无", "火炉白噪音").forEach { n ->
+                FilterChip(selected = noise == n, onClick = { noise = n; WhiteNoisePlayer.play(context, n); scope.launch { Repo.settings.setWhiteNoise(n) } }, label = { Text(n) }, modifier = Modifier.padding(end = 4.dp, bottom = 4.dp))
             } }
-            Text("点击即可播放 / 切换背景白噪音（离线合成，无需联网）", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("点击即可播放 / 切换背景白噪音（本地音频，离线循环）", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
@@ -276,29 +276,43 @@ fun SleepScreen(nav: NavController) {
             Spacer(Modifier.height(Dimen.s8))
             Row(Modifier.fillMaxWidth()) {
                 val slept = todayRec != null
-                Button(onClick = { markSleep() }, modifier = Modifier.weight(1f).padding(end = Dimen.s6).height(52.dp),
+                Button(onClick = { markSleep() }, modifier = Modifier.weight(1f).padding(end = Dimen.s6).height(60.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (slept) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
                         contentColor = if (slept) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
                     )) {
-                    Icon(Icons.Filled.Bedtime, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("😴 我睡觉啦", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        if (slept) Text("已记 ${TimeUtil.formatClock(todayRec!!.sleepTime)}", style = MaterialTheme.typography.bodySmall)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Bedtime, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("😴 我睡觉啦", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            if (slept) "已记 ${TimeUtil.formatClock(todayRec!!.sleepTime)}" else "待记录",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (slept) LocalExtraColors.current.success else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                        )
                     }
                 }
                 val woke = todayRec?.wakeTime?.let { it > todayRec.sleepTime } ?: false
-                Button(onClick = { markWake() }, modifier = Modifier.weight(1f).padding(start = Dimen.s6).height(52.dp),
+                Button(onClick = { markWake() }, modifier = Modifier.weight(1f).padding(start = Dimen.s6).height(60.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (woke) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
                         contentColor = if (woke) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
                     )) {
-                    Icon(Icons.Filled.WbSunny, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🌞 我起床啦", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        if (woke) Text("已记 ${TimeUtil.formatClock(todayRec!!.wakeTime)}", style = MaterialTheme.typography.bodySmall)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.WbSunny, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("🌞 我起床啦", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            if (woke) "已记 ${TimeUtil.formatClock(todayRec!!.wakeTime)}" else "待记录",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (woke) LocalExtraColors.current.success else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                        )
                     }
                 }
             }
@@ -449,32 +463,29 @@ fun SleepScreen(nav: NavController) {
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("目标 & 就寝提醒", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
-            var targetH by remember { mutableStateOf(targetMin / 60) }
-            var targetM by remember { mutableStateOf(targetMin % 60) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("目标睡眠时长", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 Button(onClick = {
-                    TimePickerDialog(context, { _, h, m -> targetH = h; targetM = m; scope.launch { Repo.settings.setSleepTargetMin(h * 60 + m) } },
-                        targetH, targetM, true).show()
-                }) { Text("${targetH}h${targetM}m") }
+                    TimePickerDialog(context, { _, h, m -> scope.launch { Repo.settings.setSleepTargetMin(h * 60 + m) } },
+                        targetMin / 60, targetMin % 60, true).show()
+                }) { Text("${targetMin / 60}h${targetMin % 60}m") }
             }
             Spacer(Modifier.height(Dimen.s8))
             val notifyOn by Repo.settings.notificationEnabled.collectAsStateWithLifecycle(true)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("就寝提醒", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                var rh by remember { mutableStateOf(if (remindMin < 0) 22 else remindMin / 60) }
-                var rm by remember { mutableStateOf(if (remindMin < 0) 30 else remindMin % 60) }
                 Button(onClick = {
+                    val initH = if (remindMin < 0) 22 else remindMin / 60
+                    val initM = if (remindMin < 0) 30 else remindMin % 60
                     TimePickerDialog(context, { _, h, m ->
-                        rh = h; rm = m
                         val minOfDay = h * 60 + m
                         scope.launch {
                             Repo.settings.setSleepRemindMin(minOfDay)
                             if (notifyOn) scheduleSleepReminder(context, minOfDay)
                             Toast.makeText(context, "已设就寝提醒 ${"%02d:%02d".format(h, m)}", Toast.LENGTH_SHORT).show()
                         }
-                    }, rh, rm, true).show()
-                }) { Text(if (remindMin < 0) "未设置" else "${rh}:${"%02d".format(rm)}") }
+                    }, initH, initM, true).show()
+                }) { Text(if (remindMin < 0) "未设置" else "%02d:%02d".format(remindMin / 60, remindMin % 60)) }
                 Spacer(Modifier.width(Dimen.s8))
                 if (remindMin >= 0) {
                     TextButton(onClick = {

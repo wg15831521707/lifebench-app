@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 /**
  * 多套主题色彩预设。每套定义主色/次色在浅色与深色模式下的取值，
  * 背景、表面、文字等中性色保持全局统一（见 Color.kt），仅主/次色随预设切换，
- * 既能一键换肤，又保证可读性。默认预设为「经典青」。
+ * 既能一键换肤，又保证可读性。默认预设为「蔷薇粉」（列表首位）。
  */
 data class ThemePreset(
     val id: String,
@@ -19,6 +19,12 @@ data class ThemePreset(
 )
 
 val ThemePresets = listOf(
+    ThemePreset(
+        id = "pink", name = "蔷薇粉",
+        primaryLight = Color(0xFFD6497F), primaryDark = Color(0xFFFF8FB6),
+        primaryContainerLight = Color(0xFFFFD9E6), primaryContainerDark = Color(0xFF5A1E35),
+        secondaryLight = Color(0xFFC76BB0), secondaryDark = Color(0xFFB2579B),
+    ),
     ThemePreset(
         id = "teal", name = "经典青",
         primaryLight = Color(0xFF1A9C84), primaryDark = Color(0xFF7FD0C2),
@@ -42,12 +48,6 @@ val ThemePresets = listOf(
         primaryLight = Color(0xFFEF7A2E), primaryDark = Color(0xFFFFA766),
         primaryContainerLight = Color(0xFFFCE0CC), primaryContainerDark = Color(0xFF5E2E12),
         secondaryLight = Color(0xFFF2A93B), secondaryDark = Color(0xFFD9912C),
-    ),
-    ThemePreset(
-        id = "pink", name = "蔷薇粉",
-        primaryLight = Color(0xFFD6497F), primaryDark = Color(0xFFFF8FB6),
-        primaryContainerLight = Color(0xFFFFD9E6), primaryContainerDark = Color(0xFF5A1E35),
-        secondaryLight = Color(0xFFC76BB0), secondaryDark = Color(0xFFB2579B),
     ),
     ThemePreset(
         id = "purple", name = "星空紫",
