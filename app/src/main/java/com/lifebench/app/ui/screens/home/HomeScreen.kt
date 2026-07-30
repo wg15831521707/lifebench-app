@@ -86,7 +86,10 @@ fun HomeScreen(nav: NavController) {
     }
 
     val lastSleep = recentSleep.firstOrNull()
-    val sleepText = lastSleep?.let { "${CalcUtil.fmtSleep(it.durationMin)}" } ?: "未记录"
+    val sleepText = lastSleep?.let {
+        val q = when (it.quality) { 1 -> "差"; 2 -> "中"; 3 -> "好"; else -> "" }
+        "${CalcUtil.fmtSleep(it.durationMin)}" + if (q.isNotEmpty()) " · $q" else ""
+    } ?: "未记录"
 
     val cal = Calendar.getInstance()
     val year = cal.get(Calendar.YEAR)

@@ -64,6 +64,14 @@ class SettingsStore(private val context: Context) {
     val appLockEnabled: Flow<Boolean> = ds.data.map { it[KEY_LOCK] ?: false }
     suspend fun setAppLockEnabled(v: Boolean) = ds.edit { it[KEY_LOCK] = v }
 
+    // —— 目标睡眠时长（分钟），默认 480（8 小时）——
+    val sleepTargetMin: Flow<Int> = ds.data.map { it[KEY_SLEEP_TARGET] ?: 480 }
+    suspend fun setSleepTargetMin(v: Int) = ds.edit { it[KEY_SLEEP_TARGET] = v.coerceIn(240, 720) }
+
+    // —— 就寝提醒时间（HH:mm 的分钟数，如 22:30 -> 1350）；-1 表示关闭 ——
+    val sleepRemindMin: Flow<Int> = ds.data.map { it[KEY_SLEEP_REMIND] ?: -1 }
+    suspend fun setSleepRemindMin(v: Int) = ds.edit { it[KEY_SLEEP_REMIND] = v }
+
     // 一键清空（谨慎使用，仅导入覆盖前调用）
     suspend fun clearAll() = ds.edit { it.clear() }
 
@@ -78,5 +86,7 @@ class SettingsStore(private val context: Context) {
         private val KEY_PRESET = stringPreferencesKey("theme_preset")
         private val KEY_STEP_BASE = longPreferencesKey("step_baseline")
         private val KEY_LOCK = booleanPreferencesKey("app_lock")
+        private val KEY_SLEEP_TARGET = intPreferencesKey("sleep_target_min")
+        private val KEY_SLEEP_REMIND = intPreferencesKey("sleep_remind_min")
     }
 }

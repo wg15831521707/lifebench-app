@@ -70,15 +70,18 @@ fun BarChart(
     }
 }
 
-/** 折线图：用于睡眠波动、专注力趋势等。 */
+/** 折线图：用于睡眠波动、专注力趋势等。可绘制一条目标基准虚线。 */
 @Composable
 fun LineChart(
     values: List<Float>,
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    target: Float? = null,
+    targetLabel: String? = null
 ) {
     if (values.isEmpty()) return
-    val max = values.maxOrNull()!!.coerceAtLeast(1f)
+    val targetVal = target ?: Float.MAX_VALUE
+    val max = maxOf(values.maxOrNull()!!, targetVal).coerceAtLeast(1f)
     val min = values.minOrNull()!!.coerceAtMost(0f)
     val span = (max - min).coerceAtLeast(1f)
     Canvas(modifier = modifier.fillMaxWidth().height(160.dp)) {
@@ -86,6 +89,20 @@ fun LineChart(
         val stepX = size.width / (n - 1)
         val toY: (Float) -> Float = { v ->
             size.height - ((v - min) / span) * size.height * 0.85f - size.height * 0.075f
+        }
+        // 目标基准虚线
+        if (target != null) {
+            val yT = toY(target)
+            val dash = 8.dp.toPx(); val gap = 6.dp.toPx()
+            var x = 0f
+            while (x < size.width) {
+                drawLine(
+                    color = Color.Gray.copy(alpha = 0.7f),
+                    start = Offset(x, yT), end = Offset(minOf(x + dash, size.width), yT),
+                    strokeWidth = 2.dp.toPx()
+                )
+                x += dash + gap
+            }
         }
         val path = Path()
         values.forEachIndexed { i, v ->

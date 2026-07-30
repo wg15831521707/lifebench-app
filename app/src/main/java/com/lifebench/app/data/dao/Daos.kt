@@ -41,6 +41,7 @@ data class CategorySum(
 interface SleepDao {
     @Insert suspend fun insert(e: SleepEntity): Long
     @Delete suspend fun delete(e: SleepEntity)
+    @Update suspend fun update(e: SleepEntity)
     @Query("DELETE FROM sleep WHERE date=:day")
     suspend fun deleteByDate(day: Long)
     @Transaction

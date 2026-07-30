@@ -33,6 +33,7 @@ import com.lifebench.app.ui.theme.ChartPalette
 import com.lifebench.app.ui.components.MetricLine
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.LocalExtraColors
+import com.lifebench.app.util.AlarmScheduler
 import com.lifebench.app.util.CalcUtil
 import com.lifebench.app.util.NotificationUtil
 import com.lifebench.app.util.TimeUtil
@@ -166,29 +167,152 @@ fun FocusScreen(nav: NavController) {
 }
 
 // ——— 睡眠记录 ———
+/** 睡眠质量文案/配色：0 未评 1 差 2 中 3 好。 */
+private fun qualityLabel(q: Int) = when (q) { 1 -> "差"; 2 -> "中"; 3 -> "好"; else -> "未评" }
+private fun qualityColor(q: Int) = when (q) {
+    1 -> MaterialTheme.colorScheme.error
+    2 -> MaterialTheme.colorScheme.tertiary
+    3 -> LocalExtraColors.current.success
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+/** 就寝提醒通知 id 固定值，避免与闹钟冲突。 */
+private const val SLEEP_REMIND_ID = 9001
+
 @Composable
 fun SleepScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val recent by Repo.sleep.observeRecent().collectAsStateWithLifecycle(emptyList())
-    var sleepTs by remember { mutableStateOf(System.currentTimeMillis() - 8 * 3600_000) } // 默认昨晚 23:00
-    var wakeTs by remember { mutableStateOf(System.currentTimeMillis()) }                  // 今早 07:00
-    val suggestion = remember(recent) { CalcUtil.sleepSuggestion(recent) }
-    val lineData = recent.reversed().map { it.durationMin.toFloat() }
+    val targetMin by Repo.settings.sleepTargetMin.collectAsStateWithLifecycle(480)
+    val remindMin by Repo.settings.sleepRemindMin.collectAsStateWithLifecycle(-1)
+
+    // —— 一键记时间：基于 upsertByDate 按入睡日去重 ——
+    var editQuality by remember { mutableStateOf(0) }        // 表单用：保存时的质量
+    var editing by remember { mutableStateOf<SleepEntity?>(null) }
+    var showQualityDialog by remember { mutableStateOf<SleepEntity?>(null) }
+
+    // 今天的入睡日 dayKey
+    val todaySleepDay = TimeUtil.dayKey()
+    val todayRec = remember(recent, todaySleepDay) { recent.firstOrNull { it.date == todaySleepDay } }
+
+    // 一键记「我睡觉啦」：记录入睡时刻（按今天入睡日去重）
+    fun markSleep() {
+        val now = System.currentTimeMillis()
+        scope.launch {
+            val existing = Repo.sleep.getByDate(todaySleepDay)
+            val wake = existing?.wakeTime ?: now
+            val dur = TimeUtil.sleepDurationMin(now, wake)
+            Repo.sleep.upsertByDate(
+                SleepEntity(date = todaySleepDay, sleepTime = now, wakeTime = wake, durationMin = dur,
+                    quality = existing?.quality ?: 0)
+            )
+            Toast.makeText(context, "已记录入睡时间 ${TimeUtil.formatClock(now)}", Toast.LENGTH_SHORT).show()
+        }
+    }
+    // 一键记「我起床啦」：补起床时刻并核算时长
+    fun markWake() {
+        val now = System.currentTimeMillis()
+        scope.launch {
+            val existing = Repo.sleep.getByDate(todaySleepDay)
+            if (existing == null) {
+                // 没记入睡：以今早 1 点前估算入睡（兜底，避免时长异常）
+                val estSleep = now - 60L * 60_000L * 6 // 估 6 小时前
+                val dur = TimeUtil.sleepDurationMin(estSleep, now)
+                Repo.sleep.upsertByDate(
+                    SleepEntity(date = todaySleepDay, sleepTime = estSleep, wakeTime = now, durationMin = dur, quality = 0)
+                )
+                Toast.makeText(context, "未记录入睡，已按 6 小时前估算并保存", Toast.LENGTH_SHORT).show()
+            } else {
+                val dur = TimeUtil.sleepDurationMin(existing.sleepTime, now)
+                Repo.sleep.update(existing.copy(wakeTime = now, durationMin = dur))
+                Toast.makeText(context, "已记录起床时间 ${TimeUtil.formatClock(now)}，时长 ${TimeUtil.formatDuration(dur)}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun saveForm(sleepTs: Long, wakeTs: Long, quality: Int) {
+        val dur = TimeUtil.sleepDurationMin(sleepTs, wakeTs)
+        scope.launch {
+            Repo.sleep.upsertByDate(
+                SleepEntity(date = TimeUtil.dayKey(sleepTs), sleepTime = sleepTs, wakeTime = wakeTs,
+                    durationMin = dur, quality = quality)
+            )
+            Toast.makeText(context, "已保存（按入睡日期覆盖，不会重复记录）", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("睡眠作息", showBack = true, onBack = { nav.popBackStack() })
         Spacer(Modifier.height(Dimen.s12))
+
+        // —— 顶部：近一周平均 + 目标达标率环形 ——
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             val avgMin = if (recent.isEmpty()) 0 else recent.map { it.durationMin }.average().toInt()
-            MetricLine(icon = Icons.Filled.Bedtime, label = "近一周平均睡眠",
-                value = if (recent.isEmpty()) "暂无" else TimeUtil.formatDuration(avgMin),
-                valueColor = MaterialTheme.colorScheme.primary)
+            val rate = if (targetMin > 0) (avgMin.toFloat() / targetMin).coerceIn(0f, 1.3f) else 0f
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(72.dp).weight(0.4f), contentAlignment = Alignment.Center) {
+                    RingProgress(progress = rate, color = MaterialTheme.colorScheme.primary)
+                    Text(if (recent.isEmpty()) "暂无" else "${TimeUtil.formatDuration(avgMin)}",
+                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Column(Modifier.weight(1f).padding(start = Dimen.s12)) {
+                    Text("近一周平均睡眠", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (recent.isEmpty()) "开始记录吧" else "达标率 ${ (rate * 100).toInt() }%",
+                        style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary)
+                    Text("目标 ${TimeUtil.formatDuration(targetMin)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
         Spacer(Modifier.height(Dimen.s12))
+
+        // —— 一键记录按钮（我睡觉啦 / 我起床啦）——
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("记录昨晚睡眠", style = MaterialTheme.typography.titleMedium)
+            Text("快速记录", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
+            Row(Modifier.fillMaxWidth()) {
+                val slept = todayRec != null
+                Button(onClick = { markSleep() }, modifier = Modifier.weight(1f).padding(end = Dimen.s6).height(52.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (slept) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                        contentColor = if (slept) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
+                    )) {
+                    Icon(Icons.Filled.Bedtime, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("😴 我睡觉啦", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        if (slept) Text("已记 ${TimeUtil.formatClock(todayRec!!.sleepTime)}", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                val woke = todayRec?.wakeTime?.let { it > todayRec.sleepTime } ?: false
+                Button(onClick = { markWake() }, modifier = Modifier.weight(1f).padding(start = Dimen.s6).height(52.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (woke) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                        contentColor = if (woke) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
+                    )) {
+                    Icon(Icons.Filled.WbSunny, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🌞 我起床啦", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        if (woke) Text("已记 ${TimeUtil.formatClock(todayRec!!.wakeTime)}", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            Spacer(Modifier.height(Dimen.s8))
+            PrimaryButton("一键记昨晚（23:00→07:00）", onClick = {
+                val sleepTs = TimeUtil.dayKey() - 60L * 60_000L // 昨晚 23:00（dayKey 是今 0 点，往前 1h）
+                val wakeTs = TimeUtil.dayKey() + 7L * 60 * 60_000L // 今 07:00
+                saveForm(sleepTs, wakeTs, editQuality)
+            }, icon = Icons.Filled.HistoryEdu)
+        }
+        Spacer(Modifier.height(Dimen.s12))
+
+        // —— 手动表单（可设质量）——
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            Text("手动记录（含睡眠质量）", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Dimen.s8))
+            var sleepTs by remember { mutableStateOf(System.currentTimeMillis() - 8 * 3600_000) }
+            var wakeTs by remember { mutableStateOf(System.currentTimeMillis()) }
             Button(onClick = {
                 val cal = Calendar.getInstance().apply { timeInMillis = sleepTs }
                 TimePickerDialog(context, { _, h, m -> cal.set(Calendar.HOUR_OF_DAY, h); cal.set(Calendar.MINUTE, m); sleepTs = cal.timeInMillis }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
@@ -199,48 +323,203 @@ fun SleepScreen(nav: NavController) {
                 TimePickerDialog(context, { _, h, m -> cal.set(Calendar.HOUR_OF_DAY, h); cal.set(Calendar.MINUTE, m); wakeTs = cal.timeInMillis }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
             }) { Text("起床 ${TimeUtil.formatClock(wakeTs)}") }
             Spacer(Modifier.height(Dimen.s8))
+            // 质量选择（差/中/好）
+            Text("睡眠质量", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth().padding(top = Dimen.s4)) {
+                listOf(1 to "差", 2 to "中", 3 to "好").forEach { (qv, qn) ->
+                    FilterChip(selected = editQuality == qv, onClick = { editQuality = qv },
+                        label = { Text(qn) }, modifier = Modifier.padding(end = Dimen.s6))
+                }
+            }
+            Spacer(Modifier.height(Dimen.s8))
             val dur = TimeUtil.sleepDurationMin(sleepTs, wakeTs)
             Text("睡眠时长：${TimeUtil.formatDuration(dur)}", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(Dimen.s8))
-            PrimaryButton("保存记录", onClick = {
-                scope.launch {
-                    Repo.sleep.upsertByDate(SleepEntity(date = TimeUtil.dayKey(sleepTs), sleepTime = sleepTs, wakeTime = wakeTs, durationMin = dur))
-                    Toast.makeText(context, "已保存（按入睡日期覆盖，不会重复记录）", Toast.LENGTH_SHORT).show()
-                }
-            }, icon = Icons.Filled.Save)
+            PrimaryButton("保存记录", onClick = { saveForm(sleepTs, wakeTs, editQuality) }, icon = Icons.Filled.Save)
         }
         Spacer(Modifier.height(Dimen.s12))
+
+        // —— 本周 vs 上周对比 ——
         if (recent.isNotEmpty()) {
             AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-                Text("近一周睡眠记录", style = MaterialTheme.typography.titleMedium)
+                val (thisWeek, lastWeek) = remember(recent) {
+                    val now = System.currentTimeMillis()
+                    val tw = recent.filter { it.date >= TimeUtil.dayKey() - 6L * 86_400_000L }
+                    val lw = recent.filter { it.date in (TimeUtil.dayKey() - 13L * 86_400_000L) until (TimeUtil.dayKey() - 6L * 86_400_000L) }
+                    val avg = { list: List<SleepEntity> -> if (list.isEmpty()) 0 else list.map { it.durationMin }.average().toInt() }
+                    avg(tw) to avg(lw)
+                }
+                Text("本周 vs 上周平均", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(Dimen.s8))
-                recent.reversed().forEach { r ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = Dimen.s6), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("${TimeUtil.formatMonthDay(r.sleepTime)} 入睡 ${TimeUtil.formatClock(r.sleepTime)}", style = MaterialTheme.typography.bodyMedium)
-                            Text("${TimeUtil.formatMonthDay(r.wakeTime)} 起床 ${TimeUtil.formatClock(r.wakeTime)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Text(TimeUtil.formatDuration(r.durationMin), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                Row(Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("本周", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (thisWeek == 0) "—" else TimeUtil.formatDuration(thisWeek),
+                            style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("上周", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (lastWeek == 0) "—" else TimeUtil.formatDuration(lastWeek),
+                            style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
             Spacer(Modifier.height(Dimen.s12))
         }
+
+        // —— 近一周记录列表（可编辑质量/删除）——
+        if (recent.isNotEmpty()) {
+            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+                Text("近一周睡眠记录", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(Dimen.s8))
+                recent.reversed().forEach { r ->
+                    val q = r.quality
+                    Row(Modifier.fillMaxWidth().padding(vertical = Dimen.s6), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("${TimeUtil.formatMonthDay(r.sleepTime)}（${TimeUtil.formatClock(r.sleepTime)}→${TimeUtil.formatClock(r.wakeTime)}）",
+                                style = MaterialTheme.typography.bodyMedium)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("时长 ${TimeUtil.formatDuration(r.durationMin)}", style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(Dimen.s8))
+                                Surface(shape = RoundedCornerShape(Dimen.s6), color = qualityColor(q).copy(alpha = 0.15f)) {
+                                    Text("质量 ${qualityLabel(q)}", style = MaterialTheme.typography.bodySmall,
+                                        color = qualityColor(q), modifier = Modifier.padding(horizontal = Dimen.s6, vertical = 2.dp))
+                                }
+                            }
+                        }
+                        IconButton(onClick = { showQualityDialog = r }) {
+                            Icon(Icons.Filled.Star, "评质量", tint = if (q > 0) LocalExtraColors.current.success else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = {
+                            scope.launch { Repo.sleep.delete(r); Toast.makeText(context, "已删除该记录", Toast.LENGTH_SHORT).show() }
+                        }) {
+                            Icon(Icons.Filled.Delete, "删除", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(Dimen.s12))
+        }
+
+        // —— 折线图（带目标基准线）——
         if (recent.isNotEmpty()) {
             AppCard(Modifier.padding(horizontal = Dimen.s16)) {
                 Text("近一周睡眠时长（分钟）", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(Dimen.s8))
-                LineChart(lineData, MaterialTheme.colorScheme.primary)
+                LineChart(recent.reversed().map { it.durationMin.toFloat() }, MaterialTheme.colorScheme.primary,
+                    target = targetMin.toFloat(), targetLabel = "目标")
             }
             Spacer(Modifier.height(Dimen.s12))
-            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-                Text("睡眠改善建议", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(Dimen.s8))
-                Text(suggestion, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        // —— 建议（按档位高亮）——
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            val (icon, tint, bg) = remember(recent) {
+                val s = CalcUtil.sleepSuggestion(recent)
+                when {
+                    s.contains("偏少") -> Triple(Icons.Filled.Warning, MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.errorContainer)
+                    s.contains("波动") -> Triple(Icons.Filled.Sync, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.tertiaryContainer)
+                    s.contains("偏多") -> Triple(Icons.Filled.Info, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
+                    else -> Triple(Icons.Filled.CheckCircle, LocalExtraColors.current.success, LocalExtraColors.current.success.copy(alpha = 0.12f))
+                }
+            }
+            Text("睡眠改善建议", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Dimen.s8))
+            Row(Modifier.fillMaxWidth().background(bg, RoundedCornerShape(Dimen.s8)).padding(Dimen.s8),
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(Dimen.s8))
+                Text(CalcUtil.sleepSuggestion(recent), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+            }
+        }
+        Spacer(Modifier.height(Dimen.s12))
+
+        // —— 目标与就寝提醒设置 ——
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            Text("目标 & 就寝提醒", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Dimen.s8))
+            var targetH by remember { mutableStateOf(targetMin / 60) }
+            var targetM by remember { mutableStateOf(targetMin % 60) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("目标睡眠时长", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Button(onClick = {
+                    TimePickerDialog(context, { _, h, m -> targetH = h; targetM = m; scope.launch { Repo.settings.setSleepTargetMin(h * 60 + m) } },
+                        targetH, targetM, true).show()
+                }) { Text("${targetH}h${targetM}m") }
+            }
+            Spacer(Modifier.height(Dimen.s8))
+            val notifyOn by Repo.settings.notificationEnabled.collectAsStateWithLifecycle(true)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("就寝提醒", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                var rh by remember { mutableStateOf(if (remindMin < 0) 22 else remindMin / 60) }
+                var rm by remember { mutableStateOf(if (remindMin < 0) 30 else remindMin % 60) }
+                Button(onClick = {
+                    TimePickerDialog(context, { _, h, m ->
+                        rh = h; rm = m
+                        val minOfDay = h * 60 + m
+                        scope.launch {
+                            Repo.settings.setSleepRemindMin(minOfDay)
+                            if (notifyOn) scheduleSleepReminder(context, minOfDay)
+                            Toast.makeText(context, "已设就寝提醒 ${"%02d:%02d".format(h, m)}", Toast.LENGTH_SHORT).show()
+                        }
+                    }, rh, rm, true).show()
+                }) { Text(if (remindMin < 0) "未设置" else "${rh}:${"%02d".format(rm)}") }
+                Spacer(Modifier.width(Dimen.s8))
+                if (remindMin >= 0) {
+                    TextButton(onClick = {
+                        scope.launch {
+                            Repo.settings.setSleepRemindMin(-1)
+                            AlarmScheduler.cancel(context, SLEEP_REMIND_ID)
+                        }
+                    }) { Text("关闭", color = MaterialTheme.colorScheme.error) }
+                }
             }
         }
         Spacer(Modifier.height(Dimen.s24))
     }
+
+    // 质量评分弹窗
+    if (showQualityDialog != null) {
+        val rec = showQualityDialog!!
+        AlertDialog(onDismissRequest = { showQualityDialog = null },
+            title = { Text("评价睡眠质量") },
+            text = {
+                Row(Modifier.fillMaxWidth()) {
+                    listOf(1 to "差", 2 to "中", 3 to "好").forEach { (qv, qn) ->
+                        FilterChip(selected = rec.quality == qv, onClick = {
+                            scope.launch { Repo.sleep.update(rec.copy(quality = qv)); showQualityDialog = null }
+                        }, label = { Text(qn) }, modifier = Modifier.padding(end = Dimen.s6))
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showQualityDialog = null }) { Text("完成") } })
+    }
+}
+
+/** 环形进度：用于睡眠达标率。 */
+@Composable
+private fun RingProgress(progress: Float, color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val stroke = 10.dp.toPx()
+        drawArc(color = color.copy(alpha = 0.18f), startAngle = -90f, sweepAngle = 360f, useCenter = false,
+            style = Stroke(width = stroke))
+        drawArc(color = color, startAngle = -90f, sweepAngle = 360f * progress.coerceIn(0f, 1f), useCenter = false,
+            style = Stroke(width = stroke))
+    }
+}
+
+/** 调度就寝提醒（当天或次日该时刻的精确闹钟）。 */
+private fun scheduleSleepReminder(context: Context, minOfDay: Int) {
+    val cal = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, minOfDay / 60); set(Calendar.MINUTE, minOfDay % 60)
+        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_MONTH, 1)
+    }
+    AlarmScheduler.schedule(context, AlarmScheduler.Alarm(
+        id = SLEEP_REMIND_ID, triggerAt = cal.timeInMillis,
+        title = "该休息啦 🌙", text = "已到就寝提醒时间，放下手机，准备入睡吧。"
+    ))
 }
 
 // ——— 收支记账 ———
