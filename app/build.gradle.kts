@@ -13,8 +13,8 @@ android {
         minSdk = 26                                   // 最低兼容 Android 8.0
         targetSdk = 34
         // 版本号采用语义化版本 X.Y.Z；versionCode 由 X*10000 + Y*100 + Z 推导（1.0.0 -> 10000），保证单调递增
-        versionCode = 10300
-        versionName = "1.3.0"
+        versionCode = 10301
+        versionName = "1.3.1"
     }
 
     buildTypes {

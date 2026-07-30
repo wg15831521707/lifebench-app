@@ -1,12 +1,12 @@
 package com.lifebench.app.ui.screens.brain
 
-import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,9 +14,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.lifebench.app.data.Repo
@@ -33,14 +37,18 @@ import kotlinx.coroutines.launch
  */
 
 // ——— 舒尔特方格 ———
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SchulteScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
-    val nOptions = listOf(3, 4, 5, 6, 7, 8, 9)
+    val nOptions = listOf(3, 4, 5, 6, 7, 8)              // 3~8 共 6 个规格，自动换行不再挤压 7×7 / 8×8
     var size by remember { mutableStateOf(5) }
-    var mode by remember { mutableStateOf("继续") }            // 中断 / 继续
+    var mode by remember { mutableStateOf("继续") }       // 中断 / 继续
     var numbers by remember { mutableStateOf((1..size * size).toList()) }
-    var running by remember { mutableStateOf(false) }
+    // 4 色循环（默认/绿/红/teal），与数字位置同步洗牌，强化训练辨识又不杂乱
+    var cellColors by remember { mutableStateOf<List<Color>>(emptyList()) }
+    var phase by remember { mutableStateOf("idle") }       // idle | countdown | running | done
+    var countdown by remember { mutableStateOf(0) }        // 3 → 2 → 1
     var expected by remember { mutableStateOf(1) }
     var errors by remember { mutableStateOf(0) }
     var startTime by remember { mutableStateOf(0L) }
@@ -50,10 +58,21 @@ fun SchulteScreen(nav: NavController) {
     var lastClicked by remember { mutableStateOf(-1) }
     val history by Repo.schulte.observeAll().collectAsStateWithLifecycle(emptyList())
 
-    /** 重置本局：重新洗牌、归零计时与计数。 */
+    val palette = listOf(
+        Color(0xFF1F2426),  // 默认（onSurface 黑）
+        Color(0xFF6BBF73),  // 绿 - SuccessLight
+        Color(0xFFD8695F),  // 红 - ErrorLight
+        Color(0xFF1A9C84),  // teal - PrimaryLight（设计系统主色）
+    )
+
+    /** 重置本局：重新洗牌、归零计时与计数、刷新颜色。 */
     fun reset() {
-        numbers = (1..size * size).toList().shuffled()
-        running = false
+        val ns = (1..size * size).toList().shuffled()
+        numbers = ns
+        // 错落分配（步长 7 与 3 错开，避免连续同色），保证每盘看起来新但不会全同色
+        cellColors = List(ns.size) { palette[(it * 7 + 3) % 4] }
+        phase = "idle"
+        countdown = 0
         expected = 1
         errors = 0
         startTime = 0L
@@ -62,22 +81,39 @@ fun SchulteScreen(nav: NavController) {
         lastClicked = -1
     }
 
-    // 计时循环：running 期间每 100ms 刷新用时；暂停/结束即停。
-    LaunchedEffect(running) {
-        if (!running) return@LaunchedEffect
-        startTime = System.currentTimeMillis()
-        elapsed = 0L
-        while (running) {
+    /** 点「开始」→ 启动 3-2-1 倒计时，倒计时归零后自动进入 running 并开始计时。 */
+    fun startWithCountdown() {
+        reset()
+        countdown = 3
+        phase = "countdown"
+    }
+
+    // 倒计时驱动：countdown>0 时每秒 -1，归零后切到 running 并启动秒表
+    LaunchedEffect(phase, countdown) {
+        if (phase != "countdown") return@LaunchedEffect
+        if (countdown > 0) {
+            delay(1000)
+            countdown--
+        } else {
+            phase = "running"
+            startTime = System.currentTimeMillis()
+            elapsed = 0L
+        }
+    }
+
+    // 计时循环：running 期间每 100ms 刷新用时；phase 离开 running 自动停。
+    LaunchedEffect(phase) {
+        if (phase != "running") return@LaunchedEffect
+        while (phase == "running") {
             delay(100)
             elapsed = System.currentTimeMillis() - startTime
         }
     }
 
-    /** 本局结束：记录用时与错误、比对个人最佳、入库并弹报告。 */
-    fun finish() {
-        if (!running) return
-        running = false
-        // 入库前用当前历史判断本局是否刷新该规格最短用时（efficiency 字段保留以兼容表结构，统一写 0）
+    /** 自然完成：写入记录、判断新纪录、弹报告。 */
+    fun complete() {
+        if (phase != "running") return
+        phase = "done"
         val prevBest = history.filter { it.size == size }.minOfOrNull { it.timeMs }
         isNewRecord = prevBest == null || elapsed < prevBest
         val r = SchulteResultEntity(size = size, timeMs = elapsed, errors = errors, efficiency = 0f, mode = mode)
@@ -85,18 +121,33 @@ fun SchulteScreen(nav: NavController) {
         scope.launch { Repo.schulte.insert(r) }
     }
 
+    /** 取消/放弃：倒计时或 running 阶段都可触发；不写记录、不算最佳、不弹报告。 */
+    fun cancel() {
+        if (phase == "idle") return
+        phase = "idle"
+        finished = null
+        isNewRecord = false
+        expected = 1
+        errors = 0
+        elapsed = 0L
+    }
+
     /** 点击格子：点中下一个数字→前进；点错→错误+1，中断模式直接结束。 */
     fun onCell(v: Int) {
-        if (!running) return
+        if (phase != "running") return
         if (v == expected) {
             lastClicked = v
             expected++
-            if (expected > size * size) finish()
+            if (expected > size * size) complete()
         } else {
             errors++
-            if (mode == "中断") finish()
+            if (mode == "中断") complete()
         }
     }
+
+    val mins = (elapsed / 60000).toInt()
+    val secs = ((elapsed / 1000) % 60).toInt()
+    val timerText = "%02d:%02d".format(mins, secs)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("舒尔特方格", showBack = true, onBack = { nav.popBackStack() })
@@ -104,47 +155,117 @@ fun SchulteScreen(nav: NavController) {
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("规格（数字 1 ~ n² 按升序点击）")
             Spacer(Modifier.height(Dimen.s4))
-            Row { nOptions.forEach { s -> FilterChip(selected = size == s, onClick = { size = s; reset() }, label = { Text("${s}×${s}") }, modifier = Modifier.padding(end = 4.dp)) } }
-            Spacer(Modifier.height(Dimen.s8))
+            // FlowRow 让 3~8 共 6 个 chip 在窄屏自动换行，解决 7×7 被挤成 3 行的 bug
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Dimen.s4),
+                verticalArrangement = Arrangement.spacedBy(Dimen.s4),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                nOptions.forEach { s ->
+                    FilterChip(
+                        selected = size == s,
+                        onClick = { size = s; reset() },
+                        label = { Text("${s}×${s}") }
+                    )
+                }
+            }
+            Spacer(Modifier.height(Dimen.s12))
             Text("点错处理")
-            Row { listOf("继续", "中断").forEach { m -> FilterChip(selected = mode == m, onClick = { mode = m }, label = { Text(m) }, modifier = Modifier.padding(end = 4.dp)) } }
+            Spacer(Modifier.height(Dimen.s4))
+            Row {
+                listOf("继续", "中断").forEach { m ->
+                    FilterChip(
+                        selected = mode == m,
+                        onClick = { mode = m },
+                        label = { Text(m) },
+                        modifier = Modifier.padding(end = Dimen.s4)
+                    )
+                }
+            }
         }
         Spacer(Modifier.height(Dimen.s12))
+        // 计时区：左错误、中间 mm:ss 等宽 teal 大字、右下一个；居中突出计时。
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("用时 %d 秒".format(elapsed / 1000), modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                Text("错误 $errors", color = if (errors > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "错误 $errors",
+                    modifier = Modifier.weight(1f),
+                    color = if (errors > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    timerText,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    "下一个：$expected / ${size * size}",
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.End,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            Spacer(Modifier.height(Dimen.s4))
-            Text("下一个：$expected / ${size * size}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Dimen.s12))
-        if (!running) {
-            PrimaryButton(if (expected == 1) "开始" else "重新开始", onClick = { reset(); running = true }, modifier = Modifier.padding(horizontal = Dimen.s16))
+        if (phase == "idle" || phase == "done") {
+            PrimaryButton("开始", onClick = { startWithCountdown() }, modifier = Modifier.padding(horizontal = Dimen.s16))
         } else {
-            OutlinedButton(onClick = { finish() }, modifier = Modifier.fillMaxWidth().padding(horizontal = Dimen.s16)) { Text("提前结束") }
+            OutlinedButton(
+                onClick = { cancel() },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimen.s16)
+            ) {
+                Text(if (phase == "countdown") "取消倒计时" else "放弃本局")
+            }
         }
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val gap = 4.dp
+                val gap = Dimen.s8
                 val cell = (maxWidth - gap * (size - 1)) / size
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(size),
-                    modifier = Modifier.fillMaxWidth().height(cell * size + gap * (size - 1)),
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                    horizontalArrangement = Arrangement.spacedBy(gap),
-                ) {
-                    items(numbers) { v ->
-                        val isClicked = v == lastClicked
-                        Surface(
-                            shape = MaterialTheme.shapes.medium,
-                            color = if (isClicked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.size(cell).clickable { onCell(v) }
+                val gridHeight = cell * size + gap * (size - 1)
+                Box(Modifier.fillMaxWidth().height(gridHeight)) {
+                    // 倒计时覆盖在网格区域：3-2-1 全屏大数字，不显示 cell
+                    if (phase == "countdown" && countdown > 0) {
+                        Box(
+                            Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("$v", style = MaterialTheme.typography.titleLarge,
-                                    color = if (isClicked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            Text(
+                                "$countdown",
+                                fontSize = 96.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(size),
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(gap),
+                            horizontalArrangement = Arrangement.spacedBy(gap),
+                        ) {
+                            items(numbers.size) { idx ->
+                                val v = numbers[idx]
+                                val color = cellColors.getOrElse(idx) { MaterialTheme.colorScheme.onSurface }
+                                Surface(
+                                    shape = RoundedCornerShape(Dimen.s8),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                    modifier = Modifier.size(cell).clickable { onCell(v) }
+                                ) {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(
+                                            "$v",
+                                            style = MaterialTheme.typography.headlineSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = color
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
