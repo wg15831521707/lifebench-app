@@ -35,6 +35,8 @@ android {
             storePassword = ksp.getProperty("storePassword")
             keyAlias = ksp.getProperty("keyAlias")
             keyPassword = ksp.getProperty("keyPassword")
+            // 关键：本密钥库为 PKCS12 格式，AGP 默认 storeType="jks"，必须显式指定否则签名阶段失败
+            storeType = ksp.getProperty("storeType") ?: "PKCS12"
         }
     } else {
         null

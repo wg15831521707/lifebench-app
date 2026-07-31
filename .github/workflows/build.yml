@@ -52,10 +52,17 @@ jobs:
 
       - name: 准备稳定签名密钥（从 Secret 解码，覆盖安装保留数据）
         if: ${{ secrets.SIGNING_KEY != '' }}
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/lifebench-release.keystore
-          printf 'storeFile=lifebench-release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
-            "${{ secrets.KEYSTORE_PASSWORD }}" "${{ secrets.KEY_ALIAS }}" "${{ secrets.KEY_PASSWORD }}" > app/keystore.properties
+          echo "$SIGNING_KEY" | base64 -d > app/lifebench-release.keystore
+          printf 'storeFile=lifebench-release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\nstoreType=PKCS12\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > app/keystore.properties
+          echo "--- keystore verify ---"
+          keytool -list -keystore app/lifebench-release.keystore -storepass "$KEYSTORE_PASSWORD" -storetype PKCS12 >/dev/null 2>&1 && echo "KEYSTORE OK" || echo "KEYSTORE FAIL"
         shell: bash
 
       - name: 编译 Debug APK
