@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.LocalExtraColors
@@ -117,7 +118,8 @@ fun MetricLine(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(
@@ -131,8 +133,19 @@ fun MetricLine(
         }
         Spacer(Modifier.width(Dimen.s12))
         Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = valueColor)
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    value, style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold, color = valueColor,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (trailing != null) {
+                    Spacer(Modifier.width(Dimen.s6))
+                    trailing()
+                }
+            }
         }
     }
 }

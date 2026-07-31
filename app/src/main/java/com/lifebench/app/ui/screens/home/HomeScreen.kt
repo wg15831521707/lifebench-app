@@ -50,14 +50,25 @@ import java.util.*
 @Composable
 fun HomeScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
-    var focusMin by remember { mutableStateOf(0) }
-    var weekExpense by remember { mutableStateOf(0.0) }
     val recentSleep by Repo.sleep.observeRecent().collectAsStateWithLifecycle(emptyList())
     val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
     val todos by Repo.todo.observeActive().collectAsStateWithLifecycle(emptyList())
     val archived by Repo.todo.observeArchived().collectAsStateWithLifecycle(emptyList())
     val habits by Repo.habit.observeActiveHabits().collectAsStateWithLifecycle(emptyList())
     val allCheckIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
+
+    // 今日专注时长 & 本周支出：直接订阅 Room Flow，回到首页自动刷新（不再因 LaunchedEffect(Unit) 而陈旧）
+    val now = System.currentTimeMillis()
+    val dayStart = TimeUtil.dayKey(now)
+    val focusMin by Repo.focus.focusMinutesBetweenFlow(dayStart, now + 1)
+        .collectAsStateWithLifecycle(initialValue = 0)
+    val cal = remember { Calendar.getInstance().apply { firstDayOfWeek = Calendar.MONDAY } }
+    cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+    val weekStart = TimeUtil.dayKey(cal.timeInMillis)
+    val weekEnd = weekStart + 7L * 86_400_000
+    val weekExpense by Repo.account.sumByTypeFlow(0, weekStart, weekEnd)
+        .collectAsStateWithLifecycle(initialValue = 0.0)
+
     val todayKey = TimeUtil.dayKey()
     val todayHabitChecked = allCheckIns.count { it.date == todayKey }
     val byHabit = allCheckIns.groupBy { it.habitId }.mapValues { m -> m.value.map { it.date }.toSet() }
@@ -72,33 +83,21 @@ fun HomeScreen(nav: NavController) {
     val streakProgress = (longestStreak.toFloat() / streakMilestone).coerceIn(0f, 1f)
     val streakRemain = (streakMilestone - longestStreak).coerceAtLeast(0)
 
-    val now = System.currentTimeMillis()
-    LaunchedEffect(Unit) {
-        val dayStart = TimeUtil.dayKey(now)
-        focusMin = Repo.focus.focusMinutesBetween(dayStart, now)
-        // 本周一 0 点 ~ 下周一 0 点
-        val cal = Calendar.getInstance().apply { firstDayOfWeek = Calendar.MONDAY }
-        cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-        TimeUtil.dayKey(cal.timeInMillis).also { ws ->
-            val we = ws + 7L * 86_400_000
-            weekExpense = Repo.account.sumByType(0, ws, we)
-        }
+    val lastSleep = recentSleep.firstOrNull()
+    val sleepHoursText = lastSleep?.let { CalcUtil.fmtSleep(it.durationMin) } ?: "未记录"
+    val sleepQuality = lastSleep?.quality?.let {
+        when (it) { 1 -> "差"; 2 -> "中"; 3 -> "好"; else -> null }
     }
 
-    val lastSleep = recentSleep.firstOrNull()
-    val sleepText = lastSleep?.let {
-        val q = when (it.quality) { 1 -> "差"; 2 -> "中"; 3 -> "好"; else -> "" }
-        "${CalcUtil.fmtSleep(it.durationMin)}" + if (q.isNotEmpty()) " · $q" else ""
-    } ?: "未记录"
-
-    val cal = Calendar.getInstance()
-    val year = cal.get(Calendar.YEAR)
-    val weekday = SimpleDateFormat("EEEE", Locale.CHINA).format(cal.time)
-    val dateStr = "${cal.get(Calendar.MONTH) + 1}月${cal.get(Calendar.DAY_OF_MONTH)}日"
+    // 今日日期：另起一个 cal（weekStart 用的 cal 已被设成周一，year/month 都不是今天）
+    val todayCal = remember { Calendar.getInstance() }
+    val year = todayCal.get(Calendar.YEAR)
+    val weekday = SimpleDateFormat("EEEE", Locale.CHINA).format(todayCal.time)
+    val dateStr = "${todayCal.get(Calendar.MONTH) + 1}月${todayCal.get(Calendar.DAY_OF_MONTH)}日"
     // 每日一语：以「日期」为随机种子，当天稳定、跨天换新（不按天序号循环，池大小无关）
-    val daySeed = (cal.get(Calendar.YEAR) * 10000L
-            + (cal.get(Calendar.MONTH) + 1) * 100L
-            + cal.get(Calendar.DAY_OF_MONTH)).toLong()
+    val daySeed = (todayCal.get(Calendar.YEAR) * 10000L
+            + (todayCal.get(Calendar.MONTH) + 1) * 100L
+            + todayCal.get(Calendar.DAY_OF_MONTH)).toLong()
     val quote = DAILY_QUOTES[kotlin.random.Random(daySeed).nextInt(DAILY_QUOTES.size)]
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -144,17 +143,21 @@ fun HomeScreen(nav: NavController) {
 
         Spacer(Modifier.height(Dimen.s12))
 
-        // 统计胶囊：今日专注 + 睡眠
-        Row(Modifier.padding(horizontal = Dimen.s16)) {
+        // 统计胶囊：今日专注 + 睡眠概况。Row 用 IntrinsicSize.Min 让两盒等高，
+        // 避免"5h20m·中"长文本换行后两盒高度不一致。
+        Row(
+            Modifier.padding(horizontal = Dimen.s16).height(IntrinsicSize.Min)
+        ) {
             MetricCapsule(
                 icon = Icons.Filled.PlayArrow, label = "今日专注", value = "${focusMin} 分",
                 actionText = "开始专注", onAction = { nav.navigate(Routes.FOCUS) },
-                modifier = Modifier.weight(1f).padding(end = Dimen.s6)
+                modifier = Modifier.weight(1f).padding(end = Dimen.s6).fillMaxHeight()
             )
             MetricCapsule(
-                icon = Icons.Filled.Bedtime, label = "睡眠概况", value = sleepText,
+                icon = Icons.Filled.Bedtime, label = "睡眠概况", value = sleepHoursText,
                 actionText = "去记录", onAction = { nav.navigate(Routes.SLEEP) },
-                modifier = Modifier.weight(1f).padding(start = Dimen.s6)
+                modifier = Modifier.weight(1f).padding(start = Dimen.s6).fillMaxHeight(),
+                trailing = sleepQuality?.let { q -> { SleepQualityChip(q) } }
             )
         }
 
@@ -270,29 +273,30 @@ fun HomeScreen(nav: NavController) {
 
         Spacer(Modifier.height(Dimen.s8))
         LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimen.s16).heightIn(max = 320.dp),
-            verticalArrangement = Arrangement.spacedBy(Dimen.s8),
-            horizontalArrangement = Arrangement.spacedBy(Dimen.s8)
+            columns = GridCells.Fixed(3),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimen.s16).heightIn(max = 360.dp),
+            verticalArrangement = Arrangement.spacedBy(Dimen.s12),
+            horizontalArrangement = Arrangement.spacedBy(Dimen.s12)
         ) {
             items(quickEntries.size) { i ->
                 val e = quickEntries[i]
                 val (c, t) = chipTint(i)
                 Column(
-                    Modifier.clickable { nav.navigate(e.route) }.padding(Dimen.s8),
+                    Modifier.clickable { nav.navigate(e.route) }.padding(Dimen.s6),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Surface(
-                        shape = MaterialTheme.shapes.medium,
+                        shape = MaterialTheme.shapes.large,
                         color = c,
-                        modifier = Modifier.size(48.dp)
+                        shadowElevation = 2.dp,
+                        modifier = Modifier.size(56.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(e.icon, contentDescription = e.label, tint = t)
+                            Icon(e.icon, contentDescription = e.label, tint = t, modifier = Modifier.size(28.dp))
                         }
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Text(e.label, style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(6.dp))
+                    Text(e.label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -302,6 +306,7 @@ fun HomeScreen(nav: NavController) {
 
 /**
  * 统计胶囊：图标芯片 + 指标行 + 行动按钮，统一首页三项数据概览的视觉。
+ * `trailing` 会在 value 文本右侧追加一个小型徽章（如睡眠质量"好/中/差"），避免长文本被截断。
  */
 @Composable
 private fun MetricCapsule(
@@ -311,12 +316,36 @@ private fun MetricCapsule(
     actionText: String,
     onAction: () -> Unit,
     modifier: Modifier = Modifier,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     AppCard(modifier = modifier) {
-        MetricLine(icon = icon, label = label, value = value, valueColor = valueColor)
+        MetricLine(icon = icon, label = label, value = value, valueColor = valueColor, trailing = trailing)
         Spacer(Modifier.height(Dimen.s8))
         TextButton(onClick = onAction, modifier = Modifier.align(Alignment.End)) { Text(actionText) }
+    }
+}
+
+/** 睡眠质量小徽章：好=success，中=warning，差=error，与全局语义色一致。 */
+@Composable
+private fun SleepQualityChip(q: String) {
+    val (bg, fg) = when (q) {
+        "好" -> LocalExtraColors.current.success.copy(alpha = 0.18f) to LocalExtraColors.current.success
+        "中" -> LocalExtraColors.current.warning.copy(alpha = 0.20f) to LocalExtraColors.current.warning
+        else -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.error
+    }
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = bg,
+        modifier = Modifier.padding(top = 6.dp)
+    ) {
+        Text(
+            q,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
     }
 }
 
@@ -378,7 +407,22 @@ private fun QuadrantCell(
             }
             Spacer(Modifier.height(10.dp))
             if (items.isEmpty()) {
-                Text("暂无任务", fontSize = 12.sp, color = info.text.copy(alpha = 0.5f))
+                Column {
+                    Text("暂无任务", fontSize = 12.sp, color = info.text.copy(alpha = 0.72f))
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape, color = info.accent,
+                            modifier = Modifier.size(16.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("+", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                        Spacer(Modifier.width(5.dp))
+                        Text("点此添加任务", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = info.accent.copy(alpha = 0.95f))
+                    }
+                }
             } else {
                 items.forEach { t ->
                     Row(
@@ -426,7 +470,16 @@ private fun HubShortcut(
     nav: NavController, modifier: Modifier = Modifier, accent: Int
 ) {
     val (c, t) = chipTint(accent)
-    AppCard(modifier = modifier, onClick = { nav.navigate(route) }) {
+    AppCard(modifier = modifier, onClick = {
+        // 必须使用与底部导航一致的导航选项（popUpTo + saveState + launchSingleTop + restoreState），
+        // 否则从首页的快捷入口跳转后，底部导航栏的"首页"再次点击无法正确回弹
+        // （原因：普通 nav.navigate 把目标推入栈顶后，popUpTo(start) 弹不到目标之上的多余项）。
+        nav.navigate(route) {
+            popUpTo(nav.graph.startDestinationRoute ?: Routes.HOME) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = RoundedCornerShape(12.dp), color = c, modifier = Modifier.size(44.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = t, modifier = Modifier.size(24.dp)) }

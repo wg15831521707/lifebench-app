@@ -18,7 +18,7 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.6`（`versionCode 10306`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.7`（`versionCode 10307`）；包名 `com.lifebench.app`。
 
 ## 更新日志
 
@@ -62,6 +62,17 @@
   - 主题色彩预设「蔷薇粉」调整为列表首位并设为默认主题色（新装及未手动改过主题的用户默认蔷薇粉）。
   - 全局设置「月度消费预算」去除括号标注（元），仅保留纯标题。
   - 番茄钟白噪音：移除旧版实时合成的雨声/森林/海浪/咖啡馆，改用真实音频文件 `res/raw/fireplace.mp3`（火炉白噪音），离线循环播放；播放器改为基于 MediaPlayer 的预设映射，后续新增白噪音只需放文件 + 加一条映射，零改播放逻辑。
+
+### v1.3.7 (2026-07-31, patch)
+- **首页工作台精细打磨 + Bug 修复**
+  - **Bug 修复**
+    - 睡眠概况胶囊与今日专注胶囊高度不齐：根因 `MetricLine` 的 value 文本大字号下换行把睡眠盒撑高；改为 value 单行省略 + 新增 `trailing` 槽位承载「睡眠质量」徽章（好=绿/中=橙/差=红），两胶囊外层 `Row(IntrinsicSize.Min)` + `fillMaxHeight()` 强制等高。
+    - 首页「专注空间 / 工具箱」快捷入口跳转后，底部导航「首页」无法再点击跳转：根因 `HubShortcut` 用普通 `nav.navigate` 推栈与底部导航的 `popUpTo+saveState+launchSingleTop+restoreState` 模式不一致；统一为相同导航选项。
+    - 从专注 / 记账页返回首页后数据陈旧：改 `LaunchedEffect(Unit)` 一次性加载为订阅 Room Flow（`focusMinutesBetweenFlow` / `sumByTypeFlow`），源数据变化自动刷新。
+  - **精细打磨**
+    - 「全部工具」网格由 4 列改为 3 列，图标 48→56dp 并加 2dp 投影，间距加大，更精致易点。
+    - 待办四象限空格新增引导：「暂无任务」下加「＋ 点此添加任务」强调色提示，点击整格直达待办页。
+    - 四象限「暂无任务」字色透明度 0.5→0.72，提升对比度可读性。
 
 ### v1.3.1 (2026-07-30, patch)
 - **Bug 修复**

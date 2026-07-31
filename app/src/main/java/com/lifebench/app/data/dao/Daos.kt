@@ -27,6 +27,8 @@ interface AccountDao {
     fun observeRange(s: Long, e: Long): Flow<List<AccountEntity>>
     @Query("SELECT COALESCE(SUM(amount),0) FROM account WHERE type=:type AND date BETWEEN :s AND :e")
     suspend fun sumByType(type: Int, s: Long, e: Long): Double
+    @Query("SELECT COALESCE(SUM(amount),0) FROM account WHERE type=:type AND date BETWEEN :s AND :e")
+    fun sumByTypeFlow(type: Int, s: Long, e: Long): Flow<Double>
     @Query("SELECT category, SUM(amount) AS sum FROM account WHERE type=:type AND date BETWEEN :s AND :e GROUP BY category")
     suspend fun sumByCategory(type: Int, s: Long, e: Long): List<CategorySum>
 }
@@ -158,6 +160,8 @@ interface FocusSessionDao {
     fun observeAll(): Flow<List<FocusSessionEntity>>
     @Query("SELECT COALESCE(SUM(plannedMin),0) FROM focus_session WHERE type='专注' AND startTime BETWEEN :s AND :e")
     suspend fun focusMinutesBetween(s: Long, e: Long): Int
+    @Query("SELECT COALESCE(SUM(plannedMin),0) FROM focus_session WHERE type='专注' AND startTime BETWEEN :s AND :e")
+    fun focusMinutesBetweenFlow(s: Long, e: Long): Flow<Int>
     @Query("SELECT COUNT(*) FROM focus_session WHERE type='专注' AND interrupted=1 AND startTime BETWEEN :s AND :e")
     suspend fun interruptCountBetween(s: Long, e: Long): Int
 }
