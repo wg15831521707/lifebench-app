@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
 }
 
+import java.util.Properties
+
 android {
     namespace = "com.lifebench.app"
     compileSdk = 34
@@ -18,7 +20,7 @@ android {
         // Room schema 导出目录：配合 AppDatabase exportSchema=true，便于校验迁移 / 未来 AutoMigration
         javaCompileOptions {
             annotationProcessorOptions {
-                arguments += mapOf("room.schemaLocation" to "$projectDir/schemas")
+                arguments += listOf("room.schemaLocation" to "$projectDir/schemas")
             }
         }
     }
@@ -27,7 +29,7 @@ android {
     // 优先读取 app/keystore.properties（本地存在或 CI 步骤写入）；不存在则回退默认 debug 密钥。
     val keystorePropsFile = project.file("keystore.properties")
     val stableSigning = if (keystorePropsFile.exists()) {
-        val ksp = java.util.Properties().apply {
+        val ksp = Properties().apply {
             keystorePropsFile.inputStream().use { load(it) }
         }
         signingConfigs.create("stable") {
