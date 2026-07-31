@@ -66,7 +66,52 @@ jobs:
         shell: bash
 
       - name: 编译 Debug APK
-        run: ~/.gradle-home/gradle-8.6/bin/gradle assembleDebug --no-daemon
+        run: ~/.gradle-home/gradle-8.6/bin/gradle assembleDebug --no-daemon 2>&1 | tee build.log
+
+      - name: 上报构建错误（诊断通道，看完即删）
+        if: failure()
+        env:
+          GH: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import os, json, urllib.request
+          diag = []
+          # 1) keystore 步骤产物状态
+          import os.path as P
+          diag.append("=== keystore step state ===")
+          diag.append("app/keystore.properties exists: " + str(P.exists("app/keystore.properties")))
+          diag.append("app/lifebench-release.keystore exists: " + str(P.exists("app/lifebench-release.keystore")))
+          if P.exists("app/lifebench-release.keystore"):
+              diag.append("keystore size: " + str(P.getsize("app/lifebench-release.keystore")))
+          # 2) keytool 校验
+          import subprocess
+          if P.exists("app/lifebench-release.keystore"):
+              pw = os.environ.get("KEYSTORE_PASSWORD","")
+              r = subprocess.run(["keytool","-list","-keystore","app/lifebench-release.keystore",
+                                  "-storepass",pw,"-storetype","PKCS12"],
+                                 capture_output=True, text=True)
+              diag.append("keytool rc=" + str(r.returncode))
+              diag.append((r.stdout or r.stderr)[-300:])
+          # 3) build 错误尾部
+          try:
+              log = open("build.log", encoding="utf-8", errors="replace").read()
+          except Exception as e:
+              log = "no build.log: " + str(e)
+          diag.append("=== build.log tail ===")
+          diag.append(log[-3500:])
+          body = "## CI build failed (diag)\n\n```\n" + "\n".join(diag) + "\n```"
+          data = json.dumps({"body": body}).encode("utf-8")
+          req = urllib.request.Request(
+              "https://api.github.com/repos/wg15831521707/lifebench-app/commits/" + os.environ["SHA"] + "/comments",
+              data=data, method="POST",
+              headers={"Authorization": "token " + os.environ["GH"], "Content-Type": "application/json"})
+          try:
+              rr = urllib.request.urlopen(req, timeout=30)
+              print("comment posted", rr.status)
+          except Exception as e:
+              print("comment err", e)
+          PY
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
