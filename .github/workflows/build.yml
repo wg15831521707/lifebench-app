@@ -45,8 +45,9 @@ jobs:
       - name: 准备 Gradle 8.6（仓库未提交 wrapper jar，直接调用 gradle 二进制）
         run: |
           if [ ! -x ~/.gradle-home/gradle-8.6/bin/gradle ]; then
-            curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.6-bin.zip
             mkdir -p ~/.gradle-home
+            curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.6-bin.zip \
+              || curl -L -o gradle.zip https://mirrors.cloud.tencent.com/gradle/gradle-8.6-bin.zip
             unzip -q gradle.zip -d ~/.gradle-home
           fi
 
