@@ -15,9 +15,35 @@ android {
         // 版本号采用语义化版本 X.Y.Z；versionCode 由 X*10000 + Y*100 + Z 推导（1.0.0 -> 10000），保证单调递增
         versionCode = 10307
         versionName = "1.3.7"
+        // Room schema 导出目录：配合 AppDatabase exportSchema=true，便于校验迁移 / 未来 AutoMigration
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += mapOf("room.schemaLocation" to "$projectDir/schemas")
+            }
+        }
+    }
+
+    // ===== 统一签名密钥（稳定，跨构建 / CI 一致，覆盖安装保留数据）=====
+    // 优先读取 app/keystore.properties（本地存在或 CI 步骤写入）；不存在则回退默认 debug 密钥。
+    val keystorePropsFile = project.file("keystore.properties")
+    val stableSigning = if (keystorePropsFile.exists()) {
+        val ksp = java.util.Properties().apply {
+            keystorePropsFile.inputStream().use { load(it) }
+        }
+        signingConfigs.create("stable") {
+            storeFile = file(ksp.getProperty("storeFile")!!)
+            storePassword = ksp.getProperty("storePassword")
+            keyAlias = ksp.getProperty("keyAlias")
+            keyPassword = ksp.getProperty("keyPassword")
+        }
+    } else {
+        null
     }
 
     buildTypes {
+        debug {
+            signingConfig = stableSigning ?: signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false                   // 上线前可改为 true 并配 proguard
             isShrinkResources = false
@@ -25,8 +51,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // 签名配置见《APK签名打包教程》：在本机 gradle.properties 配置 KEYSTORE_PWD / KEY_PWD
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = stableSigning ?: signingConfigs.getByName("debug")
         }
     }
 

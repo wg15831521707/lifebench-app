@@ -14,6 +14,11 @@ local.properties
 # Gradle Wrapper jar（由 CI / 本机 `gradle wrapper` 生成）
 gradle/wrapper/gradle-wrapper.jar
 
+# 签名密钥与本地密钥属性（含密钥密码，严禁入库）
+*.keystore
+*.jks
+keystore.properties
+
 # OS
 .DS_Store
 Thumbs.db

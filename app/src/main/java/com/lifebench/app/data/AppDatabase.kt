@@ -11,6 +11,12 @@ import com.lifebench.app.data.entity.*
 
 /**
  * 全局 Room 数据库：聚合所有本地实体，离线存储，无后端。
+ *
+ * 迁移约定（务必遵守，防数据丢失）：
+ *  - 数据库 [version] 每次改 schema 必须 +1；
+ *  - 每跨一个版本都要提供对应 Migration（如 3→4 加 MIGRATION_3_4）并在下方 addMigrations(...) 注册；
+ *  - 严禁使用 fallbackToDestructiveMigration()（会清空用户数据，且覆盖安装时会连带丢失历史库）；
+ *  - exportSchema=true 已开启，schema 导出到 app/schemas 并提交仓库，便于 Room 在编译期校验迁移。
  */
 @Database(
     entities = [
@@ -21,7 +27,7 @@ import com.lifebench.app.data.entity.*
         HabitEntity::class, HabitCheckInEntity::class
     ],
     version = 3,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun todoDao(): TodoDao
