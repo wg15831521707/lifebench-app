@@ -18,7 +18,7 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.7`（`versionCode 10307`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.8`（`versionCode 10308`）；包名 `com.lifebench.app`。
 
 ## 更新日志
 
@@ -73,6 +73,13 @@
     - 「全部工具」网格由 4 列改为 3 列，图标 48→56dp 并加 2dp 投影，间距加大，更精致易点。
     - 待办四象限空格新增引导：「暂无任务」下加「＋ 点此添加任务」强调色提示，点击整格直达待办页。
     - 四象限「暂无任务」字色透明度 0.5→0.72，提升对比度可读性。
+
+### v1.3.8 (2026-07-31, patch)
+- **构建与数据持久化加固（为应用内自动更新铺路）**
+  - **统一稳定签名密钥**：新增正式签名 keystore（alias=lifebench，PKCS12，RSA 2048，有效期 10000 天），`debug` / `release` 构建均使用同一把密钥签名，跨本机与 CI 构建签名一致。覆盖安装自动保留 Room 数据库与 DataStore 数据，根治 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。
+  - **CI 注入密钥**：GitHub Actions 从仓库 Secrets（`SIGNING_KEY` / `KEYSTORE_PASSWORD` / `KEY_PASSWORD` / `KEY_ALIAS`）解码密钥库后构建，产物名仍为 `app-debug.apk`，下载页与发版流程无需改动。
+  - **Room 迁移策略加固**：`AppDatabase` `exportSchema` 改为 `true` 并写明迁移约定——数据库版本号每次必 +1、每跨一版必须新增 `Migration` 并在 `addMigrations()` 注册、**严禁使用 `fallbackToDestructiveMigration`**（否则会清库），schema 导出至 `app/schemas/` 便于校验。
+  - **升级须知（一次性）**：因签名密钥由调试密钥切换为正式密钥，本次升级需先**卸载旧包再重装**（该次本地数据会清空）；重装后后续所有覆盖更新均自动保留数据，无需再卸载。
 
 ### v1.3.1 (2026-07-30, patch)
 - **Bug 修复**
