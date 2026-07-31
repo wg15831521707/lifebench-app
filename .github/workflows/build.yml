@@ -1,5 +1,5 @@
 # LifeBench 安卓工程 —— 云端编译 Debug APK
-# 触发：推送到 main/master 分支（自动构建并上传产物）；或手动 workflow_dispatch（额外发布一个 GitHub Release）
+# 触发：推送到 main/master 分支（自动构建并上传产物）；或手动 workflow_dispatch（仅重新构建，不自动发版，发版由脚本处理）
 name: Build LifeBench Debug APK
 
 on:
@@ -68,40 +68,8 @@ jobs:
       - name: 编译 Debug APK
         run: ~/.gradle-home/gradle-8.6/bin/gradle assembleDebug --no-daemon 2>&1 | tee build.log
 
-      - name: 上报构建错误（诊断通道，看完即删）
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.sha }}
-          KP: ${{ secrets.KEYSTORE_PASSWORD }}
-        run: |
-          echo "$GH_TOKEN" | gh auth login --with-token
-          {
-            echo "## CI build failed (diag)"
-            echo ""
-            echo "keystore.properties exists: $([ -f app/keystore.properties ] && echo yes || echo no)"
-            echo "keystore file size: $(stat -c%s app/lifebench-release.keystore 2>/dev/null || echo NA)"
-            echo ""
-            echo "keytool open check (real password, not printed):"
-            keytool -list -keystore app/lifebench-release.keystore -storepass "$KP" -storetype PKCS12 >/dev/null 2>&1 && echo "KEYSTORE_OPEN_OK" || echo "KEYSTORE_OPEN_FAIL"
-            echo ""
-            echo "=== build.log tail ==="
-            tail -c 3500 build.log
-          } > diag.md
-          gh api repos/wg15831521707/lifebench-app/commits/$SHA/comments -f body=@diag.md || echo "gh comment failed rc=$?"
-
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
         with:
           name: lifebench-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-
-      - name: 发布 Release（仅手动触发）
-        if: github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: lifebench-v1.0.0-build-${{ github.run_number }}
-          name: "LifeBench v1.0.0 #${{ github.run_number }}"
-          files: app/build/outputs/apk/debug/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
