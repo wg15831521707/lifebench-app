@@ -51,21 +51,6 @@ jobs:
             unzip -q gradle.zip -d ~/.gradle-home
           fi
 
-      - name: 准备稳定签名密钥（从 Secret 解码，覆盖安装保留数据）
-        if: ${{ secrets.SIGNING_KEY != '' }}
-        env:
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          echo "$SIGNING_KEY" | base64 -d > app/lifebench-release.keystore
-          printf 'storeFile=lifebench-release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\nstoreType=PKCS12\n' \
-            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > app/keystore.properties
-          echo "--- keystore verify ---"
-          keytool -list -keystore app/lifebench-release.keystore -storepass "$KEYSTORE_PASSWORD" -storetype PKCS12 >/dev/null 2>&1 && echo "KEYSTORE OK" || echo "KEYSTORE FAIL"
-        shell: bash
-
       - name: 编译 Debug APK
         run: ~/.gradle-home/gradle-8.6/bin/gradle assembleDebug --no-daemon 2>&1 | tee build.log
 
