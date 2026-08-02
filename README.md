@@ -18,7 +18,7 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.3.8`（`versionCode 10308`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.4.0`（`versionCode 10400`）；包名 `com.lifebench.app`。
 
 ## 更新日志
 
@@ -73,6 +73,13 @@
     - 「全部工具」网格由 4 列改为 3 列，图标 48→56dp 并加 2dp 投影，间距加大，更精致易点。
     - 待办四象限空格新增引导：「暂无任务」下加「＋ 点此添加任务」强调色提示，点击整格直达待办页。
     - 四象限「暂无任务」字色透明度 0.5→0.72，提升对比度可读性。
+
+### v1.4.0 (2026-08-03, minor)
+- **界面层级与质感重构（设计系统落地）**
+  - **统一卡片分层**：`AppCard` 新增 `CardVariant`（SURFACE 发丝边轻投影 / ACCENT 主色容器 + 主色柔化阴影），用表面权重表达页面重心，告别全站平铺。
+  - **动效系统组件化**：新增 `RingProgress`（环形进度缓动生长 + 圆心内容槽）、动画版 `PieChart`（环形扫入 + 分类间隙）、`BarChart`（逐根错峰生长）；新增 `BudgetProgress`（预算进度 + 超预算切换 error 色）；新增 `CountUpText`（数字滚动）、`Modifier.reveal`（错峰淡入上移）、`PulseBadge`（超预算呼吸徽标）。
+  - **记账页（收支记账）接入**：收入/支出 KPI 改为 count-up 数字；预算卡升级为 ACCENT 重心卡，超预算时进度条变红并附脉冲「已超支」徽标；饼图/柱状切换均带生长动画；各卡片错峰入场。
+  - **睡眠页联动**：`RingProgress` 升级为共享动画组件，睡眠达标率环形同样获得缓动生长。
 
 ### v1.3.8 (2026-07-31, patch)
 - **构建与数据持久化加固（为应用内自动更新铺路）**

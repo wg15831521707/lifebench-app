@@ -518,17 +518,7 @@ fun SleepScreen(nav: NavController) {
     }
 }
 
-/** 环形进度：用于睡眠达标率。 */
-@Composable
-private fun RingProgress(progress: Float, color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val stroke = 10.dp.toPx()
-        drawArc(color = color.copy(alpha = 0.18f), startAngle = -90f, sweepAngle = 360f, useCenter = false,
-            style = Stroke(width = stroke))
-        drawArc(color = color, startAngle = -90f, sweepAngle = 360f * progress.coerceIn(0f, 1f), useCenter = false,
-            style = Stroke(width = stroke))
-    }
-}
+/** 睡眠达标率环形改用 ui.components.RingProgress（共享、带动画）。此处仅保留就寝提醒调度。 */
 
 /** 调度就寝提醒（当天或次日该时刻的精确闹钟）。 */
 private fun scheduleSleepReminder(context: Context, minOfDay: Int) {
@@ -563,22 +553,28 @@ fun AccountScreen(nav: NavController) {
         AppTopBar("收支记账", showBack = true, onBack = { nav.popBackStack() })
         Spacer(Modifier.height(Dimen.s12))
         Row(Modifier.padding(horizontal = Dimen.s16)) {
-            AppCard(Modifier.weight(1f).padding(end = Dimen.s6)) {
-                MetricLine(icon = Icons.Filled.Paid, label = "本月收入", value = "¥%.2f".format(income), valueColor = LocalExtraColors.current.success)
+            AppCard(Modifier.weight(1f).padding(end = Dimen.s6).reveal(0)) {
+                MetricLine(icon = Icons.Filled.Paid, label = "本月收入", value = "¥%.2f".format(income),
+                    valueContent = { CountUpText(income, format = { "¥%.2f".format(it) }, color = LocalExtraColors.current.success) })
             }
-            AppCard(Modifier.weight(1f).padding(start = Dimen.s6)) {
-                MetricLine(icon = Icons.Filled.CreditCard, label = "本月支出", value = "¥%.2f".format(expense), valueColor = MaterialTheme.colorScheme.error)
+            AppCard(Modifier.weight(1f).padding(start = Dimen.s6).reveal(1)) {
+                MetricLine(icon = Icons.Filled.CreditCard, label = "本月支出", value = "¥%.2f".format(expense),
+                    valueContent = { CountUpText(expense, format = { "¥%.2f".format(it) }, color = MaterialTheme.colorScheme.error) })
             }
         }
         Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("月度预算 ¥%.0f ${if (overBudget) "· 已超支！" else ""}".format(budget),
-                color = if (overBudget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-            LinearProgressIndicator(progress = { (expense / budget.coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(8.dp), color = if (overBudget) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+        AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(2), variant = CardVariant.ACCENT) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("月度预算 ¥%.0f".format(budget), style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.weight(1f))
+                if (overBudget) PulseBadge("已超支 ¥%.0f · %.0f%%".format(expense - budget, expense / budget * 100))
+            }
+            Spacer(Modifier.height(Dimen.s8))
+            BudgetProgress(ratio = (expense / budget.coerceAtLeast(1.0)).toFloat())
         }
         Spacer(Modifier.height(Dimen.s12))
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+        AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(3)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("收支结构", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Row { listOf("饼图", "柱状").forEach { t -> FilterChip(selected = chartType == t, onClick = { chartType = t }, label = { Text(t) }, modifier = Modifier.padding(end = 4.dp)) } }
@@ -596,6 +592,8 @@ fun AccountScreen(nav: NavController) {
                 }
             } else {
                 BarChart(pieData, MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(Dimen.s8))
+                Column { pieData.forEachIndexed { i, (c, v) -> Text("${c}：¥%.2f".format(v), color = palette.getOrElse(i) { Color.Gray }) } }
             }
         }
         Spacer(Modifier.height(Dimen.s12))

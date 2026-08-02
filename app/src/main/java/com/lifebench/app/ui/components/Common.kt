@@ -1,5 +1,6 @@
 package com.lifebench.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -47,18 +49,35 @@ fun AppTopBar(
     )
 }
 
-/** 统一卡片：圆角 16、内边距 16、点击可选（卡片悬浮微动效由 elevation 体现）。 */
+/**
+ * 卡片视觉变体：
+ * - SURFACE：常规内容卡。发丝级半透明描边（outline 令牌柔化）+ 1dp 轻投影，营造分层而非平铺；
+ * - ACCENT：页面重心卡（如预算/重点指标）。主色容器底色 + 主色柔化投影，视觉权重最高。
+ */
+enum class CardVariant { SURFACE, ACCENT }
+
+/** 统一卡片：圆角 16、内边距 16、点击可选。通过 variant 表达层级与质感。 */
 @Composable
 fun AppCard(
     modifier: Modifier = Modifier,
+    variant: CardVariant = CardVariant.SURFACE,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(Dimen.cardRadius)
+    val containerColor = if (variant == CardVariant.ACCENT) scheme.primaryContainer else scheme.surface
+    val border = if (variant == CardVariant.SURFACE) BorderStroke(1.dp, scheme.outline.copy(alpha = 0.45f)) else null
+    val elevation = if (variant == CardVariant.ACCENT) 0.dp else 1.dp
+    val accentShadow = if (variant == CardVariant.ACCENT) {
+        Modifier.shadow(8.dp, shape, spotColor = scheme.primary.copy(alpha = 0.22f))
+    } else Modifier
     Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Dimen.cardRadius),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = modifier.fillMaxWidth().then(accentShadow),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        border = border,
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation),
     ) {
         Column(
             Modifier.padding(Dimen.s16).then(if (onClick != null) Modifier.clickable { onClick.invoke() } else Modifier),
@@ -119,6 +138,7 @@ fun MetricLine(
     value: String,
     modifier: Modifier = Modifier,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    valueContent: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -135,12 +155,16 @@ fun MetricLine(
         Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    value, style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold, color = valueColor,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
+                if (valueContent != null) {
+                    valueContent()
+                } else {
+                    Text(
+                        value, style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold, color = valueColor,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
                 if (trailing != null) {
                     Spacer(Modifier.width(Dimen.s6))
                     trailing()
