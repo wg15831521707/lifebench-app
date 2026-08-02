@@ -48,21 +48,30 @@ fun ProfileScreen(nav: NavController) {
     val accounts by Repo.account.observeAll().collectAsStateWithLifecycle(emptyList())
     val notes by Repo.note.observeAll().collectAsStateWithLifecycle(emptyList())
     val focuses by Repo.focus.observeAll().collectAsStateWithLifecycle(emptyList())
+    val habits by Repo.habit.observeActiveHabits().collectAsStateWithLifecycle(emptyList())
+    val checkIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
     val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
     val fontScale by Repo.settings.fontScale.collectAsStateWithLifecycle(1.0f)
 
+    // 累计坚持天数（取各习惯最长连续），用于个人头部副标题
+    val byHabit = checkIns.groupBy { it.habitId }.mapValues { m -> m.value.map { it.date }.toSet() }
+    val longestStreak = habits.maxOfOrNull { streakOf(byHabit[it.id] ?: emptySet()) } ?: 0
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("个人中心")
+        Spacer(Modifier.height(Dimen.s12))
+        // 个人头部：渐变头像 + 昵称 + 累计坚持天数（设计系统 ProfileHeader）
+        ProfileHeader(name = "王浩", subtitle = "自律给我自由 · 已坚持 ${longestStreak} 天", avatarText = "浩")
         Spacer(Modifier.height(Dimen.s12))
         // 数据概览
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("数据概览", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Stat("待办", "${todos.size}")
-                Stat("记账", "${accounts.size}")
-                Stat("笔记", "${notes.size}")
-                Stat("专注", "${focuses.size}次")
+                StatBadge("待办", "${todos.size}")
+                StatBadge("记账", "${accounts.size}")
+                StatBadge("笔记", "${notes.size}")
+                StatBadge("专注", "${focuses.size}次")
             }
         }
         Spacer(Modifier.height(Dimen.s12))
@@ -95,7 +104,7 @@ fun ProfileScreen(nav: NavController) {
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("关于", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
-            Text("LifeBench 个人全能生活工作台 v1.4.0", fontWeight = FontWeight.SemiBold)
+            Text("LifeBench 个人全能生活工作台 v1.5.0", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(Dimen.s4))
             Text("离线优先 · 无广告 · 数据本地加密存储", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("四大主导航：首页总览 / 专注空间（番茄钟·睡眠·饮食·习惯）/ 工具箱（待办·记账·密码箱·笔记·纪念日·舒尔特）/ 个人中心。全部数据仅存于本机。",
@@ -105,12 +114,18 @@ fun ProfileScreen(nav: NavController) {
     }
 }
 
-/** 概览小指标。 */
-@Composable
-private fun Stat(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(2.dp))
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+/** 计算连续打卡天数：从今天（或昨天，若今天未打卡）往前连续计数。 */
+private fun streakOf(dates: Set<Long>): Int {
+    if (dates.isEmpty()) return 0
+    var cursor = TimeUtil.dayKey()
+    if (cursor !in dates) {
+        cursor = TimeUtil.dayKey(cursor - 86_400_000L)
+        if (cursor !in dates) return 0
     }
+    var s = 0
+    while (cursor in dates) {
+        s++
+        cursor = TimeUtil.dayKey(cursor - 86_400_000L)
+    }
+    return s
 }

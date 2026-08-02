@@ -33,8 +33,12 @@ import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.AppCard
 import com.lifebench.app.ui.components.AppTopBar
 import com.lifebench.app.ui.components.ConfirmDeleteDialog
+import com.lifebench.app.ui.components.CountUpText
+import com.lifebench.app.ui.components.HeroCard
 import com.lifebench.app.ui.components.MetricLine
+import com.lifebench.app.ui.components.SectionHeader
 import com.lifebench.app.ui.components.chipTint
+import com.lifebench.app.ui.components.reveal
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.ThemeMode
 import com.lifebench.app.util.CalcUtil
@@ -94,6 +98,13 @@ fun HomeScreen(nav: NavController) {
     val year = todayCal.get(Calendar.YEAR)
     val weekday = SimpleDateFormat("EEEE", Locale.CHINA).format(todayCal.time)
     val dateStr = "${todayCal.get(Calendar.MONTH) + 1}月${todayCal.get(Calendar.DAY_OF_MONTH)}日"
+    // 问候语：按当前小时分段，建立 Hero 第一层级的亲切感
+    val hour = todayCal.get(Calendar.HOUR_OF_DAY)
+    val greetWord = when {
+        hour < 5 -> "夜深了"; hour < 11 -> "早上好"; hour < 14 -> "中午好"
+        hour < 18 -> "下午好"; hour < 22 -> "晚上好"; else -> "夜深了"
+    }
+    val greetText = "$greetWord，王浩"
     // 每日一语：以「日期」为随机种子，当天稳定、跨天换新（不按天序号循环，池大小无关）
     val daySeed = (todayCal.get(Calendar.YEAR) * 10000L
             + (todayCal.get(Calendar.MONTH) + 1) * 100L
@@ -119,8 +130,19 @@ fun HomeScreen(nav: NavController) {
         )
 
         Spacer(Modifier.height(Dimen.s12))
+        // 顶部 Hero 锚点（设计系统第一层级）：问候 + 日期 + 头像 + 当日专注环形
+        HeroCard(
+            greeting = greetText,
+            date = "$year 年 · $weekday · $dateStr",
+            avatarText = "浩",
+            focusMin = focusMin,
+            focusTarget = 120,
+            modifier = Modifier.padding(horizontal = Dimen.s16).reveal(0)
+        )
+
+        Spacer(Modifier.height(Dimen.s12))
         // 每日一语
-        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+        AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(1)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer,
@@ -146,7 +168,7 @@ fun HomeScreen(nav: NavController) {
         // 统计胶囊：今日专注 + 睡眠概况。Row 用 IntrinsicSize.Min 让两盒等高，
         // 避免"5h20m·中"长文本换行后两盒高度不一致。
         Row(
-            Modifier.padding(horizontal = Dimen.s16).height(IntrinsicSize.Min)
+            Modifier.padding(horizontal = Dimen.s16).height(IntrinsicSize.Min).reveal(2)
         ) {
             MetricCapsule(
                 icon = Icons.Filled.PlayArrow, label = "今日专注", value = "${focusMin} 分",
@@ -167,22 +189,15 @@ fun HomeScreen(nav: NavController) {
         MetricCapsule(
             icon = Icons.Filled.AccountBalanceWallet, label = "本周支出", value = "¥%.1f".format(weekExpense),
             valueColor = MaterialTheme.colorScheme.error, actionText = "记账", onAction = { nav.navigate(Routes.ACCOUNT) },
-            modifier = Modifier.padding(horizontal = Dimen.s16)
+            modifier = Modifier.padding(horizontal = Dimen.s16).reveal(3)
         )
 
         // 首页习惯连续打卡入口
         if (habits.isNotEmpty()) {
             Spacer(Modifier.height(Dimen.s12))
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("习惯打卡", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                TextButton(onClick = { nav.navigate(Routes.HABIT) }) { Text("管理") }
-            }
+            SectionHeader("习惯打卡", moreLabel = "管理", onMore = { nav.navigate(Routes.HABIT) })
             Spacer(Modifier.height(Dimen.s8))
-            Row(Modifier.padding(horizontal = Dimen.s16)) {
+            Row(Modifier.padding(horizontal = Dimen.s16).reveal(4)) {
                 MetricCapsule(
                     icon = Icons.Filled.CheckCircle, label = "今日打卡", value = "$todayHabitChecked / ${habits.size}",
                     valueColor = MaterialTheme.colorScheme.primary, actionText = "去打卡", onAction = { nav.navigate(Routes.HABIT) },
@@ -196,7 +211,7 @@ fun HomeScreen(nav: NavController) {
             }
             Spacer(Modifier.height(Dimen.s8))
             // 连续天数进度条：最长连续天数向里程碑（7/30/100/365）递进
-            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(5)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Whatshot, contentDescription = null, tint = LocalExtraColors.current.success, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
@@ -222,14 +237,7 @@ fun HomeScreen(nav: NavController) {
 
         Spacer(Modifier.height(Dimen.s16))
         // 待办四象限「田」字格
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("待办四象限", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            TextButton(onClick = { nav.navigate(Routes.TODO) }) { Text("管理") }
-        }
+        SectionHeader("待办四象限", moreLabel = "管理", onMore = { nav.navigate(Routes.TODO) })
         Spacer(Modifier.height(Dimen.s8))
         TodoQuadrantGrid(
             todos = todos,
@@ -268,8 +276,7 @@ fun HomeScreen(nav: NavController) {
         }
 
         Spacer(Modifier.height(Dimen.s16))
-        Text("  全部工具", style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = Dimen.s16))
+        SectionHeader("全部工具")
 
         Spacer(Modifier.height(Dimen.s8))
         LazyVerticalGrid(

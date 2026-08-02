@@ -18,7 +18,7 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.4.0`（`versionCode 10400`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.0`（`versionCode 10500`）；包名 `com.lifebench.app`。
 
 ## 更新日志
 
@@ -80,6 +80,13 @@
   - **动效系统组件化**：新增 `RingProgress`（环形进度缓动生长 + 圆心内容槽）、动画版 `PieChart`（环形扫入 + 分类间隙）、`BarChart`（逐根错峰生长）；新增 `BudgetProgress`（预算进度 + 超预算切换 error 色）；新增 `CountUpText`（数字滚动）、`Modifier.reveal`（错峰淡入上移）、`PulseBadge`（超预算呼吸徽标）。
   - **记账页（收支记账）接入**：收入/支出 KPI 改为 count-up 数字；预算卡升级为 ACCENT 重心卡，超预算时进度条变红并附脉冲「已超支」徽标；饼图/柱状切换均带生长动画；各卡片错峰入场。
   - **睡眠页联动**：`RingProgress` 升级为共享动画组件，睡眠达标率环形同样获得缓动生长。
+
+### v1.5.0 (2026-08-03, minor)
+- **页面层级与质感重构（落地 lifebench-redesign.html 方案）**
+  - **设计系统组件化（新增 `ui/components/DesignSystem.kt`）**：提炼品牌渐变 `brandBrush()`（靠 `primary.compositeOver` 推导明暗、`不写死玫瑰粉`，跨主题预设通用）、`HeroCard`（首页渐变 Hero：问候 + 日期 + 头像 + 当日专注环形进度）、`SectionHeader`（4dp 主色竖条 + 标题 + 可选「查看 ›」，统一全站分组）、`ProfileHeader`（渐变圆形头像 + 昵称 + 累计坚持天数）、`StatBadge`（4 列网格统计卡）、`GradientPanel`（渐变强调面板）。
+  - **首页工作台**：顶部替换为渐变 `HeroCard`（问候随时段变化「早上好/下午好/晚上好 王浩」+ 当日专注环），各区块统一改用 `SectionHeader`，卡片错峰 `reveal()` 入场（每日一语 → 专注/睡眠 → 本周支出 → 习惯 → 连续打卡），建立清晰的视觉层级与质感。
+  - **个人中心**：新增 `ProfileHeader` 头部（渐变头像 + 「已坚持 X 天」），数据概览改 4 列 `StatBadge` 网格，版本号更新为 v1.5.0。
+  - **专注页 hub**：「今日状态」前插入 `GradientPanel` 汇总今日专注（大数字 + 目标），与首页 Hero 形成呼应，强化品牌色面板权重。
 
 ### v1.3.8 (2026-07-31, patch)
 - **构建与数据持久化加固（为应用内自动更新铺路）**

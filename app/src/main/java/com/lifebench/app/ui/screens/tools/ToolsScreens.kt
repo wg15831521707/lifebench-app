@@ -33,6 +33,7 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +43,7 @@ import androidx.navigation.NavController
 import com.lifebench.app.data.Repo
 import com.lifebench.app.data.entity.*
 import com.lifebench.app.navigation.Routes
+import com.lifebench.app.ui.components.GradientPanel
 import com.lifebench.app.ui.components.*
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.LocalExtraColors
@@ -181,6 +183,18 @@ fun FocusHubScreen(nav: NavController) {
             horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
             contentPadding = PaddingValues(vertical = Dimen.s12)
         ) {
+            items(1, span = { GridItemSpan(2) }) {
+                // 顶部焦点面板：渐变强调面板承载今日专注总时长（设计系统「强调面板」层级）
+                GradientPanel {
+                    Text("今日专注", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
+                    Spacer(Modifier.height(4.dp))
+                    Row {
+                        Text("$focusMin", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.alignByBaseline())
+                        Text(" 分钟", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f), modifier = Modifier.alignByBaseline())
+                        Text(" · 目标 120", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.alignByBaseline())
+                    }
+                }
+            }
             items(1, span = { GridItemSpan(2) }) { HubSectionHeader("今日状态", Icons.Filled.Insights) }
             items(1) { FocusStatCard(metas[0], "${focusMin} 分", "今日专注时长", nav) }
             items(1) { FocusStatCard(metas[1], fmtSleep(sleepMin), "昨晚睡眠", nav) }
