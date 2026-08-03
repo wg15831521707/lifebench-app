@@ -18,9 +18,13 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.6`（`versionCode 10506`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.7`（`versionCode 10507`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.7 (2026-08-03, minor — 品牌升级)
+- **品牌图标**：全新四瓣珐琅花自适应图标（VectorDrawable），蔷薇粉 #D6497F 品牌底色 + 右上釉面高光，暖白花瓣（绕中心 4×旋转）+ 柔接触投影 + 瓣尖高光。四瓣对应四大模块（工作台/专注/工具/我的），暗合「四象限」哲学。
+- **应用名**：显示名从「全能生活工作台」改为「**小满**」——「将满未满，慢即是快」，温暖克制，好记有温度。
 
 ### v1.3.2 (2026-07-30, patch)
 - **Bug 修复**
