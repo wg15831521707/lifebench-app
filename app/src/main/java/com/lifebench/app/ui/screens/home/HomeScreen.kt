@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,7 +33,6 @@ import com.lifebench.app.ui.components.MetricLine
 import com.lifebench.app.ui.components.SectionHeader
 import com.lifebench.app.ui.components.ToolMeta
 import com.lifebench.app.ui.components.ToolTile
-import com.lifebench.app.ui.components.reveal
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.ui.theme.LocalExtraColors
 import com.lifebench.app.ui.theme.LocalQuadrantColors
@@ -49,23 +47,22 @@ import java.util.*
 /**
  * 首页数据仪表盘：聚合今日专注、睡眠概况、本周收支，并提供快捷入口。
  *
- * 性能说明：工作台内容随使用增长（待办 / 习惯 / 已完成 越来越多），
- * 为避免单个竖向滚动 Column 把整页一次性测量 + 任意 flow 变更就重排整页，
- * 这里改用 LazyColumn（仅合成/测量可视区）+ 各区块抽成独立形参化 Composable
- * （某条 flow 变化只重排受影响区块），从根本上消除长页卡顿。
+ * 性能要点（针对「工作台内容增多后卡顿、不跟手」）：
+ * 1) 整页用 LazyColumn 虚拟化，只合成/测量可视区；
+ * 2) 各区块（习惯打卡 / 待办四象限 / 已完成 / 全部工具）**自带流订阅**：
+ *    某条数据变化（如勾选一个待办）只重排受影响区块，不触发整页 LazyColumn 重排；
+ * 3) 滚动列表的 item 上**不挂 reveal() 等入场动画**——这类 LaunchedEffect(Unit)+graphicsLayer
+ *    动画会在 item 进出视野时反复重播、每帧占用主线程，是「滑动不跟手」的直接元凶。
+ *    首页为长滚动页，故去掉逐条入场动效，保流畅优先。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(nav: NavController) {
     val scope = rememberCoroutineScope()
-    val recentSleep by Repo.sleep.observeRecent().collectAsStateWithLifecycle(emptyList())
     val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
-    val todos by Repo.todo.observeActive().collectAsStateWithLifecycle(emptyList())
-    val archived by Repo.todo.observeArchived().collectAsStateWithLifecycle(emptyList())
-    val habits by Repo.habit.observeActiveHabits().collectAsStateWithLifecycle(emptyList())
-    val allCheckIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
+    val recentSleep by Repo.sleep.observeRecent().collectAsStateWithLifecycle(emptyList())
 
-    // 今日专注时长 & 本周支出：直接订阅 Room Flow，回到首页自动刷新
+    // 仅首页顶部 Hero/概览所需的轻量流（随计时或记账变化，频率低，不驱动整页高频重排）
     val now = System.currentTimeMillis()
     val dayStart = TimeUtil.dayKey(now)
     val focusMin by Repo.focus.focusMinutesBetweenFlow(dayStart, now + 1)
@@ -76,24 +73,6 @@ fun HomeScreen(nav: NavController) {
     val weekEnd = weekStart + 7L * 86_400_000
     val weekExpense by Repo.account.sumByTypeFlow(0, weekStart, weekEnd)
         .collectAsStateWithLifecycle(initialValue = 0.0)
-
-    // 习惯连续打卡派生量：仅在 habits / allCheckIns 变化时才重算，避免无关 flow 触发时重复计算长列表
-    val streakInfo = remember(habits, allCheckIns) {
-        val todayKey = TimeUtil.dayKey()
-        val byHabit = allCheckIns.groupBy { it.habitId }.mapValues { m -> m.value.map { it.date }.toSet() }
-        val longest = habits.maxOfOrNull { computeStreak(byHabit[it.id] ?: emptySet()) } ?: 0
-        val milestone = when {
-            longest >= 365 -> 365
-            longest >= 100 -> 365
-            longest >= 30 -> 100
-            longest >= 7 -> 30
-            else -> 7
-        }
-        val progress = (longest.toFloat() / milestone).coerceIn(0f, 1f)
-        val remain = (milestone - longest).coerceAtLeast(0)
-        val todayChecked = allCheckIns.count { it.date == todayKey }
-        StreakInfo(longest, milestone, progress, remain, todayChecked)
-    }
 
     val lastSleep = recentSleep.firstOrNull()
     val sleepHoursText = lastSleep?.let { CalcUtil.fmtSleep(it.durationMin) } ?: "未记录"
@@ -141,7 +120,6 @@ fun HomeScreen(nav: NavController) {
         }
 
         item { Spacer(Modifier.height(Dimen.s12)) }
-        // 顶部 Hero 锚点：问候 + 日期 + 头像 + 当日专注环形
         item {
             HeroCard(
                 greeting = greetText,
@@ -149,16 +127,14 @@ fun HomeScreen(nav: NavController) {
                 avatarText = "浩",
                 focusMin = focusMin,
                 focusTarget = 120,
-                modifier = Modifier.padding(horizontal = Dimen.s16).reveal(0)
+                modifier = Modifier.padding(horizontal = Dimen.s16)
             )
         }
 
         item { Spacer(Modifier.height(Dimen.s12)) }
-        // 每日一语
         item { HomeQuoteCard(quote = quote, year = year, weekday = weekday, dateStr = dateStr) }
 
         item { Spacer(Modifier.height(Dimen.s12)) }
-        // 今日概览（设计系统统一分组）：KPI 胶囊归入「今日概览」区块标题下
         item {
             HomeOverviewSection(
                 focusMin = focusMin,
@@ -170,46 +146,13 @@ fun HomeScreen(nav: NavController) {
         }
 
         item { Spacer(Modifier.height(Dimen.s16)) }
-        // 首页习惯连续打卡：单张「连续打卡」卡（对应模板 .streak 布局）
-        if (habits.isNotEmpty()) {
-            item { Spacer(Modifier.height(Dimen.s12)) }
-            item { SectionHeader("习惯打卡", moreLabel = "管理", onMore = { nav.navigate(Routes.HABIT) }) }
-            item { Spacer(Modifier.height(Dimen.s8)) }
-            item {
-                HomeStreakCard(
-                    info = streakInfo,
-                    habitsSize = habits.size
-                )
-            }
-        }
+        item { HomeStreakSection(nav = nav) }
 
         item { Spacer(Modifier.height(Dimen.s16)) }
-        // 待办四象限「田」字格
-        item {
-            HomeQuadrantSection(todos = todos, nav = nav, scope = scope)
-        }
+        item { HomeQuadrantSection(nav = nav, scope = scope) }
 
-        if (archived.isNotEmpty()) {
-            item { Spacer(Modifier.height(Dimen.s12)) }
-            item {
-                Text("  已完成（${archived.size}）", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = Dimen.s16))
-            }
-            item { Spacer(Modifier.height(Dimen.s8)) }
-            // 已完成列表：虚拟化为 LazyColumn 子项，随数量增长不拖慢整页
-            items(archived, key = { it.id }) { t ->
-                var showDel by remember { mutableStateOf(false) }
-                AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(t.title, modifier = Modifier.weight(1f),
-                            textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { scope.launch { Repo.todo.update(t.copy(done = false, archived = false)) } }) { Text("恢复") }
-                        IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
-                    }
-                }
-                if (showDel) ConfirmDeleteDialog(message = "确定删除已完成的待办「${t.title}」吗？", onDismiss = { showDel = false }) { scope.launch { Repo.todo.delete(t) } }
-            }
-        }
+        item { Spacer(Modifier.height(Dimen.s16)) }
+        item { HomeArchivedSection(scope = scope) }
 
         item { Spacer(Modifier.height(Dimen.s16)) }
         // 全部工具：复用 ToolTile（与专注/工具页一致的双列卡片风格），9 个工具全部可达
@@ -235,7 +178,7 @@ fun HomeScreen(nav: NavController) {
 /** 每日一语卡片。 */
 @Composable
 private fun HomeQuoteCard(quote: Pair<String, String>, year: Int, weekday: String, dateStr: String) {
-    AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(0)) {
+    AppCard(Modifier.padding(horizontal = Dimen.s16)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer,
@@ -266,7 +209,7 @@ private fun HomeOverviewSection(
     weekExpense: Double,
     nav: NavController
 ) {
-    Column(Modifier.reveal(0)) {
+    Column {
         SectionHeader("今日概览", moreLabel = "查看", onMore = { nav.navigate(Routes.FOCUS) })
         Spacer(Modifier.height(Dimen.s8))
         // 统计胶囊：Row 用 IntrinsicSize.Min 让两盒等高
@@ -295,10 +238,44 @@ private fun HomeOverviewSection(
     }
 }
 
+/** 首页习惯连续打卡区：自带流订阅，仅在 habits/allCheckIns 变化时重排本区，不波及整页。 */
+@Composable
+private fun HomeStreakSection(nav: NavController) {
+    val habits by Repo.habit.observeActiveHabits().collectAsStateWithLifecycle(emptyList())
+    val allCheckIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
+    if (habits.isEmpty()) return
+    // 派生量：仅 habits / allCheckIns 变化时才重算，避免无关 flow 触发时重复计算长列表
+    val streakInfo = remember(habits, allCheckIns) {
+        val todayKey = TimeUtil.dayKey()
+        val byHabit = allCheckIns.groupBy { it.habitId }.mapValues { m -> m.value.map { it.date }.toSet() }
+        val longest = habits.maxOfOrNull { computeStreak(byHabit[it.id] ?: emptySet()) } ?: 0
+        val milestone = when {
+            longest >= 365 -> 365
+            longest >= 100 -> 365
+            longest >= 30 -> 100
+            longest >= 7 -> 30
+            else -> 7
+        }
+        val progress = (longest.toFloat() / milestone).coerceIn(0f, 1f)
+        val remain = (milestone - longest).coerceAtLeast(0)
+        val todayChecked = allCheckIns.count { it.date == todayKey }
+        StreakInfo(longest, milestone, progress, remain, todayChecked)
+    }
+    Column {
+        Spacer(Modifier.height(Dimen.s12))
+        SectionHeader("习惯打卡", moreLabel = "管理", onMore = { nav.navigate(Routes.HABIT) })
+        Spacer(Modifier.height(Dimen.s8))
+        HomeStreakCard(
+            info = streakInfo,
+            habitsSize = habits.size
+        )
+    }
+}
+
 /** 首页习惯连续打卡卡（对应模板 .streak 布局）。 */
 @Composable
 private fun HomeStreakCard(info: StreakInfo, habitsSize: Int) {
-    AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(0)) {
+    AppCard(Modifier.padding(horizontal = Dimen.s16)) {
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
             // 左：最长连续大数字
             Surface(
@@ -356,9 +333,10 @@ private fun HomeStreakCard(info: StreakInfo, habitsSize: Int) {
     }
 }
 
-/** 待办四象限「田」字格区块。 */
+/** 待办四象限区：自带 todos 流订阅，勾选待办只重排本区，不波及整页。 */
 @Composable
-private fun HomeQuadrantSection(todos: List<TodoEntity>, nav: NavController, scope: CoroutineScope) {
+private fun HomeQuadrantSection(nav: NavController, scope: CoroutineScope) {
+    val todos by Repo.todo.observeActive().collectAsStateWithLifecycle(emptyList())
     Column {
         SectionHeader("待办四象限", moreLabel = "管理", onMore = { nav.navigate(Routes.TODO) })
         Spacer(Modifier.height(Dimen.s8))
@@ -511,6 +489,35 @@ private fun QuadrantCell(
             }
             Spacer(Modifier.weight(1f))
             Text(info.hint, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = info.text.copy(alpha = 0.75f))
+        }
+    }
+}
+
+/** 已完成列表区：自带 archived 流订阅；用普通 Column 渲染（已完成数量通常很少，且本区重排不影响整页）。 */
+@Composable
+private fun HomeArchivedSection(scope: CoroutineScope) {
+    val archived by Repo.todo.observeArchived().collectAsStateWithLifecycle(emptyList())
+    if (archived.isEmpty()) return
+    Column(Modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(Dimen.s12))
+        Text("  已完成（${archived.size}）", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = Dimen.s16))
+        Spacer(Modifier.height(Dimen.s8))
+        archived.forEach { t ->
+            key(t.id) {
+                var showDel by remember { mutableStateOf(false) }
+                AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            t.title, modifier = Modifier.weight(1f),
+                            textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = { scope.launch { Repo.todo.update(t.copy(done = false, archived = false)) } }) { Text("恢复") }
+                        IconButton(onClick = { showDel = true }) { Icon(Icons.Filled.Delete, null) }
+                    }
+                }
+                if (showDel) ConfirmDeleteDialog(message = "确定删除已完成的待办「${t.title}」吗？", onDismiss = { showDel = false }) { scope.launch { Repo.todo.delete(t) } }
+            }
         }
     }
 }
