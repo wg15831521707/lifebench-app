@@ -18,7 +18,7 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.1`（`versionCode 10501`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.2`（`versionCode 10502`）；包名 `com.lifebench.app`。
 
 ## 更新日志
 
@@ -94,6 +94,16 @@
   - **取消睡眠页「一键记昨晚（23:00→07:00）」**：固定 23→07 的硬编码快捷在用户实际睡眠时间灵活时反而误导，改为完全由用户手动设定入睡/起床的「日期+时间」。
   - **首页待办四象限空态去重**：原空态同时显示「暂无任务」+「+ 点此添加任务」图标 + 底部「立即处理/安排时间…」hint，三行信息重复。简化为单行「暂无任务」，整格可点击进入待办页完成添加。
   - **收支记账页柱状图形态重做**：原先 `BarChart` 单一品牌色，3 类支出同色、无法辨别。参照 `lifebench-expense-detail.html` 新增 `CategorizedBarChart`（`ui/components/Charts.kt`），每根柱子按 `ChartPalette` 取色（翡翠绿/琥珀/蓝/紫/珊瑚/青绿/石板灰），柱顶显示金额、柱底显示分类名，错峰生长动画；图例用同色圆点对齐；空数据时给出降级提示。饼图形态保持不变。
+
+### v1.5.2 (2026-08-03, patch)
+- **六处 UI 精细化（基于 v1.5.1 实际使用反馈）**
+  - **睡眠「近一周平均睡眠达标率」环修正为正圆**：`Box(Modifier.size(72.dp).weight(0.4f))` 中 `size` + `weight` 在 Row 里互相覆盖导致宽>高 → 椭圆环。改为 `Modifier.weight(0.4f).aspectRatio(1f)` 强制 1:1。
+  - **睡眠「手动记录」日期+时间按钮骨架瘦身**：`OutlinedButton` 加 `heightIn(max=40.dp)` + 紧凑 `contentPadding` + `maxLines=1/softWrap=false`，时间「02:42/07:45」不再被截断换行；外层 `Row` 加 `height(IntrinsicSize.Min)` 让日期与时间按钮同高。
+  - **睡眠「目标 & 就寝提醒」按钮上下对齐**：就寝提醒行因含「关闭」TextButton（默认高 48dp）让整行撑高，「未设置」按钮相对「8h0m」下移。统一 `Row.height(48.dp)` + `Button.shape = RoundedCornerShape(20.dp)` + 「关闭」改高 32dp 紧凑 TextButton，两行垂直对齐。
+  - **首页睡眠胶囊修复「5h...」截断 + 增强显示**：把「差/中/好」质量 chip 从 `MetricLine.trailing` 槽位移到 value 下方独立一行，附「近一晚质量」小字说明，value 文本不再被挤压显示省略号。
+  - **收支记账页顶部双卡等高 + 卡片内部按内容自适应**：`Row.height(IntrinsicSize.Min)` + 两卡 `fillMaxHeight()` 强制「本月收入 ¥0.00」与「本月支出 ¥149.00」不同文字长度也保持高度一致，避免骨架变形。
+  - **收支结构图例改彩色 PillChip**：饼图/柱状图图例统一改为「分类名 + 金额」写在主题色背景上、白字加粗的胶囊（参照 `lifebench-expense-detail.html` 视觉），取代原先「色点 + 灰字」两行结构。
+  - **「＋ 记一笔」上移至月度预算下方**：从列表底部移到月度预算之后、收支结构之前，记账流程更顺手（看预算 → 立即记）。
 
 ### v1.3.8 (2026-07-31, patch)
 - **构建与数据持久化加固（为应用内自动更新铺路）**

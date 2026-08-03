@@ -255,7 +255,9 @@ fun SleepScreen(nav: NavController) {
             val avgMin = if (recent.isEmpty()) 0 else recent.map { it.durationMin }.average().toInt()
             val rate = if (targetMin > 0) (avgMin.toFloat() / targetMin).coerceIn(0f, 1.3f) else 0f
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(72.dp).weight(0.4f), contentAlignment = Alignment.Center) {
+                // 用 weight + aspectRatio(1f) 强制 1:1；之前 size(72.dp) + weight(0.4f) 在 Row 里
+                // 互相覆盖，宽度由 weight 决定后高度仍是 72dp → 出现椭圆环。
+                Box(Modifier.weight(0.4f).aspectRatio(1f), contentAlignment = Alignment.Center) {
                     RingProgress(progress = rate, color = MaterialTheme.colorScheme.primary)
                     Text(if (recent.isEmpty()) "暂无" else "${TimeUtil.formatDuration(avgMin)}",
                         style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -470,37 +472,53 @@ fun SleepScreen(nav: NavController) {
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("目标 & 就寝提醒", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // 用 height(48.dp) 锁定每行高度、Alignment.CenterVertically 让按钮与标签基线对齐，
+            // 之前就寝提醒行因含「关闭」TextButton（默认高 48dp）让整个 Row 撑高，
+            // 导致「未设置」按钮相对「8h0m」按钮下移。
+            Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("目标睡眠时长", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Button(onClick = {
-                    TimePickerDialog(context, { _, h, m -> scope.launch { Repo.settings.setSleepTargetMin(h * 60 + m) } },
-                        targetMin / 60, targetMin % 60, true).show()
-                }) { Text("${targetMin / 60}h${targetMin % 60}m") }
+                Button(
+                    onClick = {
+                        TimePickerDialog(context, { _, h, m -> scope.launch { Repo.settings.setSleepTargetMin(h * 60 + m) } },
+                            targetMin / 60, targetMin % 60, true).show()
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+                ) { Text("${targetMin / 60}h${targetMin % 60}m") }
             }
-            Spacer(Modifier.height(Dimen.s8))
+            Spacer(Modifier.height(Dimen.s4))
             val notifyOn by Repo.settings.notificationEnabled.collectAsStateWithLifecycle(true)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("就寝提醒", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Button(onClick = {
-                    val initH = if (remindMin < 0) 22 else remindMin / 60
-                    val initM = if (remindMin < 0) 30 else remindMin % 60
-                    TimePickerDialog(context, { _, h, m ->
-                        val minOfDay = h * 60 + m
-                        scope.launch {
-                            Repo.settings.setSleepRemindMin(minOfDay)
-                            if (notifyOn) scheduleSleepReminder(context, minOfDay)
-                            Toast.makeText(context, "已设就寝提醒 ${"%02d:%02d".format(h, m)}", Toast.LENGTH_SHORT).show()
-                        }
-                    }, initH, initM, true).show()
-                }) { Text(if (remindMin < 0) "未设置" else "%02d:%02d".format(remindMin / 60, remindMin % 60)) }
-                Spacer(Modifier.width(Dimen.s8))
+                Button(
+                    onClick = {
+                        val initH = if (remindMin < 0) 22 else remindMin / 60
+                        val initM = if (remindMin < 0) 30 else remindMin % 60
+                        TimePickerDialog(context, { _, h, m ->
+                            val minOfDay = h * 60 + m
+                            scope.launch {
+                                Repo.settings.setSleepRemindMin(minOfDay)
+                                if (notifyOn) scheduleSleepReminder(context, minOfDay)
+                                Toast.makeText(context, "已设就寝提醒 ${"%02d:%02d".format(h, m)}", Toast.LENGTH_SHORT).show()
+                            }
+                        }, initH, initM, true).show()
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+                ) { Text(if (remindMin < 0) "未设置" else "%02d:%02d".format(remindMin / 60, remindMin % 60)) }
                 if (remindMin >= 0) {
-                    TextButton(onClick = {
-                        scope.launch {
-                            Repo.settings.setSleepRemindMin(-1)
-                            AlarmScheduler.cancel(context, SLEEP_REMIND_ID)
-                        }
-                    }) { Text("关闭", color = MaterialTheme.colorScheme.error) }
+                    Spacer(Modifier.width(Dimen.s4))
+                    // 关闭按钮改小尺寸（高 32、padding 小），不撑高整行。
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                Repo.settings.setSleepRemindMin(-1)
+                                AlarmScheduler.cancel(context, SLEEP_REMIND_ID)
+                            }
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) { Text("关闭", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }
@@ -537,6 +555,8 @@ private fun SleepDateTimeRow(
     onPick: (Long) -> Unit,
     context: android.content.Context
 ) {
+    // IntrinsicSize.Min 让两按钮行内最大内容为基准，避免默认最小高度撑大；
+    // heightIn(max = 40.dp) 锁定单行高度。
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(48.dp))
         OutlinedButton(
@@ -546,11 +566,15 @@ private fun SleepDateTimeRow(
                     cal.set(y, m, d); onPick(cal.timeInMillis)
                 }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
             },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f).heightIn(max = 40.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
         ) {
             Icon(Icons.Filled.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
-            Text(TimeUtil.formatDate(ts), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                TimeUtil.formatDate(ts), style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1, softWrap = false
+            )
         }
         Spacer(Modifier.width(Dimen.s6))
         OutlinedButton(
@@ -561,16 +585,41 @@ private fun SleepDateTimeRow(
                     onPick(cal.timeInMillis)
                 }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
             },
-            modifier = Modifier.weight(0.7f)
+            modifier = Modifier.weight(0.85f).heightIn(max = 40.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
         ) {
             Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
-            Text(TimeUtil.formatClock(ts), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                TimeUtil.formatClock(ts), style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1, softWrap = false
+            )
         }
     }
 }
 
 /** 睡眠达标率环形改用 ui.components.RingProgress（共享、带动画）。此处仅保留就寝提醒调度。 */
+
+/**
+ * 收支结构图例 Pill：分类名+金额显示在特定颜色的胶囊上（白字+彩底），
+ * 参照 lifebench-expense-detail.html 视觉风格。柱状图/饼图共用。
+ */
+@Composable
+private fun LegendPill(text: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = color,
+        modifier = Modifier.padding(vertical = 3.dp)
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
+    }
+}
 
 /** 调度就寝提醒（当天或次日该时刻的精确闹钟）。 */
 private fun scheduleSleepReminder(context: Context, minOfDay: Int) {
@@ -604,12 +653,14 @@ fun AccountScreen(nav: NavController) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AppTopBar("收支记账", showBack = true, onBack = { nav.popBackStack() })
         Spacer(Modifier.height(Dimen.s12))
-        Row(Modifier.padding(horizontal = Dimen.s16)) {
-            AppCard(Modifier.weight(1f).padding(end = Dimen.s6).reveal(0)) {
+        // IntrinsicSize.Min + fillMaxHeight 让左右两卡同高，
+        // 避免「¥0.00」和「¥149.00」长度差导致卡片高度不齐、骨架变形。
+        Row(Modifier.padding(horizontal = Dimen.s16).height(IntrinsicSize.Min)) {
+            AppCard(Modifier.weight(1f).padding(end = Dimen.s6).fillMaxHeight().reveal(0)) {
                 MetricLine(icon = Icons.Filled.Paid, label = "本月收入", value = "¥%.2f".format(income),
                     valueContent = { CountUpText(income, format = { "¥%.2f".format(it) }, color = LocalExtraColors.current.success) })
             }
-            AppCard(Modifier.weight(1f).padding(start = Dimen.s6).reveal(1)) {
+            AppCard(Modifier.weight(1f).padding(start = Dimen.s6).fillMaxHeight().reveal(1)) {
                 MetricLine(icon = Icons.Filled.CreditCard, label = "本月支出", value = "¥%.2f".format(expense),
                     valueContent = { CountUpText(expense, format = { "¥%.2f".format(it) }, color = MaterialTheme.colorScheme.error) })
             }
@@ -625,6 +676,11 @@ fun AccountScreen(nav: NavController) {
             Spacer(Modifier.height(Dimen.s8))
             BudgetProgress(ratio = (expense / budget.coerceAtLeast(1.0)).toFloat())
         }
+        Spacer(Modifier.height(Dimen.s8))
+        // 「＋ 记一笔」上移至月度预算下方：记账流程更顺手（看预算 → 立即记）。
+        PrimaryButton("＋ 记一笔", onClick = { showAdd = true },
+            icon = Icons.Filled.AddCircleOutline,
+            modifier = Modifier.padding(horizontal = Dimen.s16))
         Spacer(Modifier.height(Dimen.s12))
         AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(3)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -640,7 +696,12 @@ fun AccountScreen(nav: NavController) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PieChart(pieData, palette, Modifier.size(150.dp))
                     Spacer(Modifier.width(Dimen.s12))
-                    Column { pieData.forEachIndexed { i, (c, v) -> Text("${c}：¥%.2f".format(v), color = palette.getOrElse(i) { Color.Gray }) } }
+                    // 图例：分类名+金额 写在彩色 Pill 上（与 HTML lifebench-expense-detail.html 一致）。
+                    Column {
+                        pieData.forEachIndexed { i, (c, v) ->
+                            LegendPill("${c} ¥%.2f".format(v), palette.getOrElse(i) { Color.Gray })
+                        }
+                    }
                 }
             } else {
                 // 柱状：参照 lifebench-expense-detail.html 的分类色柱状图，
@@ -648,14 +709,10 @@ fun AccountScreen(nav: NavController) {
                 // 下方显示分类名 + 金额，错峰生长动画。
                 CategorizedBarChart(pieData, palette, Modifier.fillMaxWidth())
                 Spacer(Modifier.height(Dimen.s8))
-                // 图例：每类一个色点 + 名称 + 金额，颜色与柱身一致。
-                Column {
+                // 图例：彩色 PillChip 风格（白字 + 主题色背景），与饼图图例统一。
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     pieData.forEachIndexed { i, (c, v) ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-                            Box(Modifier.size(10.dp).background(palette.getOrElse(i) { Color.Gray }, RoundedCornerShape(2.dp)))
-                            Spacer(Modifier.width(6.dp))
-                            Text("${c}：¥%.2f".format(v), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        LegendPill("${c} ¥%.2f".format(v), palette.getOrElse(i) { Color.Gray })
                     }
                 }
             }
@@ -675,8 +732,6 @@ fun AccountScreen(nav: NavController) {
                 if (showDel) ConfirmDeleteDialog(message = "确定删除这笔「${a.category}」记账记录吗？", onDismiss = { showDel = false }) { scope.launch { Repo.account.delete(a) } }
             }
         }
-        Spacer(Modifier.height(Dimen.s16))
-        PrimaryButton("＋ 记一笔", onClick = { showAdd = true }, modifier = Modifier.padding(horizontal = Dimen.s16))
         Spacer(Modifier.height(Dimen.s24))
     }
     if (showAdd) AccountAddDialog(onDismiss = { showAdd = false }, onSave = { type, cat, amount, note, date ->

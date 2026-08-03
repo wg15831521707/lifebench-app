@@ -179,7 +179,8 @@ fun HomeScreen(nav: NavController) {
                 icon = Icons.Filled.Bedtime, label = "睡眠概况", value = sleepHoursText,
                 actionText = "去记录", onAction = { nav.navigate(Routes.SLEEP) },
                 modifier = Modifier.weight(1f).padding(start = Dimen.s6).fillMaxHeight(),
-                trailing = sleepQuality?.let { q -> { SleepQualityChip(q) } }
+                // 把「差/中/好」质量 chip 放到 value 下方独立一行，避免「5h3m」被截成「5h...」
+                quality = sleepQuality
             )
         }
 
@@ -324,11 +325,21 @@ private fun MetricCapsule(
     onAction: () -> Unit,
     modifier: Modifier = Modifier,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
-    trailing: (@Composable () -> Unit)? = null
+    quality: String? = null
 ) {
     AppCard(modifier = modifier) {
-        MetricLine(icon = icon, label = label, value = value, valueColor = valueColor, trailing = trailing)
-        Spacer(Modifier.height(Dimen.s8))
+        MetricLine(icon = icon, label = label, value = value, valueColor = valueColor)
+        // 质量 chip 单独一行：避免睡眠时长文本与 chip 同行挤压导致 ellipsis。
+        if (quality != null) {
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SleepQualityChip(quality)
+                Spacer(Modifier.width(Dimen.s6))
+                Text("近一晚质量", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(Dimen.s4))
         TextButton(onClick = onAction, modifier = Modifier.align(Alignment.End)) { Text(actionText) }
     }
 }
