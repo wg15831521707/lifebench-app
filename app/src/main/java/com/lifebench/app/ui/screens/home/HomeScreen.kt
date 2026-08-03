@@ -414,22 +414,10 @@ private fun QuadrantCell(
             }
             Spacer(Modifier.height(10.dp))
             if (items.isEmpty()) {
-                Column {
-                    Text("暂无任务", fontSize = 12.sp, color = info.text.copy(alpha = 0.72f))
-                    Spacer(Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape, color = info.accent,
-                            modifier = Modifier.size(16.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("+", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                        Spacer(Modifier.width(5.dp))
-                        Text("点此添加任务", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = info.accent.copy(alpha = 0.95f))
-                    }
-                }
+                // 简化空态：仅一行轻提示「暂无任务 · 立即处理/安排时间/…」。
+                // 原本的「+ 点此添加任务」圆形图标+文字与「立即处理」hint 在同一格内重复出现，
+                // 视觉嘈杂、占位冗余；整格已可点击进入待办页，用户自然能完成添加。
+                Text("暂无任务", fontSize = 12.sp, color = info.text.copy(alpha = 0.72f))
             } else {
                 items.forEach { t ->
                     Row(

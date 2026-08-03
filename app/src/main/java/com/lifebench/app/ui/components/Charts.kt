@@ -1,8 +1,11 @@
 package com.lifebench.app.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -11,12 +14,17 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 /**
  * 轻量自绘图表（不依赖第三方图表库，保证离线、轻量、可控）。
@@ -132,6 +140,81 @@ fun LineChart(
         drawPath(path, color = color, style = Stroke(width = 3.dp.toPx()))
         values.forEachIndexed { i, v ->
             drawCircle(color = color, radius = 3.dp.toPx(), center = Offset(stepX * i, toY(v)))
+        }
+    }
+}
+
+/**
+ * 分类柱状图：用于收支结构柱状形态。
+ * 区别于 BarChart（单色）：每根柱子按 ChartPalette 取色，下方显示分类名 + 金额，
+ * 错峰生长动画（每根 60ms 延迟），整体无 Canvas 重绘开销。
+ */
+@Composable
+fun CategorizedBarChart(
+    items: List<Pair<String, Double>>,
+    colors: List<Color>,
+    modifier: Modifier = Modifier
+) {
+    if (items.isEmpty()) return
+    val max = items.maxOf { it.second }.coerceAtLeast(0.0001)
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = modifier.fillMaxWidth().height(168.dp),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        items.forEachIndexed { i, (label, value) ->
+            val color = colors.getOrElse(i) { Color.Gray }
+            val targetFrac = (value / max).toFloat().coerceIn(0f, 1f)
+            // 每根柱子用独立的 Animatable，错峰启动
+            val progress = remember { Animatable(0f) }
+            LaunchedEffect(Unit) {
+                delay((i * 60L).coerceAtMost(400L))
+                progress.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
+            }
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                verticalArrangement = Arrangement.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 数值标在柱顶
+                Text(
+                    "¥%.0f".format(value),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+                // 柱身：背景轨道 + 按比例填充的彩色条
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.75f)
+                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                        .background(trackColor),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(targetFrac.coerceAtLeast(0.01f) * progress.value.coerceAtLeast(0.01f))
+                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                            .background(color)
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                // 分类名
+                Text(
+                    label,
+                    fontSize = 10.5.sp,
+                    color = onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

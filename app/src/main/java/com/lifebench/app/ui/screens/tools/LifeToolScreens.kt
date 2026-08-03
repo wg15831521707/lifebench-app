@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.lifebench.app.data.Repo
@@ -316,30 +317,36 @@ fun SleepScreen(nav: NavController) {
                     }
                 }
             }
-            Spacer(Modifier.height(Dimen.s8))
-            PrimaryButton("一键记昨晚（23:00→07:00）", onClick = {
-                val sleepTs = TimeUtil.dayKey() - 60L * 60_000L // 昨晚 23:00（dayKey 是今 0 点，往前 1h）
-                val wakeTs = TimeUtil.dayKey() + 7L * 60 * 60_000L // 今 07:00
-                saveForm(sleepTs, wakeTs, editQuality)
-            }, icon = Icons.Filled.HistoryEdu)
         }
         Spacer(Modifier.height(Dimen.s12))
 
-        // —— 手动表单（可设质量）——
+        // —— 手动表单（可设日期+时间+质量）——
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("手动记录（含睡眠质量）", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
+            // 初始态：入睡 = now - 8h；起床 = now；
+            // 智能归位：若入睡与起床同日且入睡 > 起床（如 02:55 / 07:55），
+            // 把入睡日回拨到昨天，避免"显示 29 小时"的日期错位 bug。
             var sleepTs by remember { mutableStateOf(System.currentTimeMillis() - 8 * 3600_000) }
             var wakeTs by remember { mutableStateOf(System.currentTimeMillis()) }
-            Button(onClick = {
-                val cal = Calendar.getInstance().apply { timeInMillis = sleepTs }
-                TimePickerDialog(context, { _, h, m -> cal.set(Calendar.HOUR_OF_DAY, h); cal.set(Calendar.MINUTE, m); sleepTs = cal.timeInMillis }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
-            }) { Text("入睡 ${TimeUtil.formatClock(sleepTs)}") }
+            LaunchedEffect(Unit) {
+                if (TimeUtil.dayKey(sleepTs) == TimeUtil.dayKey(wakeTs) && sleepTs > wakeTs) {
+                    sleepTs -= 86_400_000L
+                }
+            }
+            SleepDateTimeRow(
+                label = "入睡",
+                ts = sleepTs,
+                onPick = { newTs -> sleepTs = newTs },
+                context = context
+            )
             Spacer(Modifier.height(Dimen.s8))
-            Button(onClick = {
-                val cal = Calendar.getInstance().apply { timeInMillis = wakeTs }
-                TimePickerDialog(context, { _, h, m -> cal.set(Calendar.HOUR_OF_DAY, h); cal.set(Calendar.MINUTE, m); wakeTs = cal.timeInMillis }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
-            }) { Text("起床 ${TimeUtil.formatClock(wakeTs)}") }
+            SleepDateTimeRow(
+                label = "起床",
+                ts = wakeTs,
+                onPick = { newTs -> wakeTs = newTs },
+                context = context
+            )
             Spacer(Modifier.height(Dimen.s8))
             // 质量选择（差/中/好）
             Text("睡眠质量", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -518,6 +525,51 @@ fun SleepScreen(nav: NavController) {
     }
 }
 
+/**
+ * 睡眠「日期+时间」双按钮行：左侧标签，右侧两个 OutlinedButton 分别选日期与选时间。
+ * 设计意图：原先只暴露 TimePicker，用户改时间却改不了日期 → 出现「02:55→07:55 显示 29h」的日期错位 bug。
+ * 暴露日期后用户可显式声明「昨晚 02:55」或「今早 02:55」，时长计算直接复用 TimeUtil.sleepDurationMin。
+ */
+@Composable
+private fun SleepDateTimeRow(
+    label: String,
+    ts: Long,
+    onPick: (Long) -> Unit,
+    context: android.content.Context
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(48.dp))
+        OutlinedButton(
+            onClick = {
+                val cal = Calendar.getInstance().apply { timeInMillis = ts }
+                DatePickerDialog(context, { _, y, m, d ->
+                    cal.set(y, m, d); onPick(cal.timeInMillis)
+                }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+            },
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(Icons.Filled.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(TimeUtil.formatDate(ts), style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.width(Dimen.s6))
+        OutlinedButton(
+            onClick = {
+                val cal = Calendar.getInstance().apply { timeInMillis = ts }
+                TimePickerDialog(context, { _, h, m ->
+                    cal.set(Calendar.HOUR_OF_DAY, h); cal.set(Calendar.MINUTE, m)
+                    onPick(cal.timeInMillis)
+                }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
+            },
+            modifier = Modifier.weight(0.7f)
+        ) {
+            Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(TimeUtil.formatClock(ts), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
 /** 睡眠达标率环形改用 ui.components.RingProgress（共享、带动画）。此处仅保留就寝提醒调度。 */
 
 /** 调度就寝提醒（当天或次日该时刻的精确闹钟）。 */
@@ -591,9 +643,21 @@ fun AccountScreen(nav: NavController) {
                     Column { pieData.forEachIndexed { i, (c, v) -> Text("${c}：¥%.2f".format(v), color = palette.getOrElse(i) { Color.Gray }) } }
                 }
             } else {
-                BarChart(pieData, MaterialTheme.colorScheme.primary)
+                // 柱状：参照 lifebench-expense-detail.html 的分类色柱状图，
+                // 每根柱子按 ChartPalette 取色（不可再有 3 根同色问题），
+                // 下方显示分类名 + 金额，错峰生长动画。
+                CategorizedBarChart(pieData, palette, Modifier.fillMaxWidth())
                 Spacer(Modifier.height(Dimen.s8))
-                Column { pieData.forEachIndexed { i, (c, v) -> Text("${c}：¥%.2f".format(v), color = palette.getOrElse(i) { Color.Gray }) } }
+                // 图例：每类一个色点 + 名称 + 金额，颜色与柱身一致。
+                Column {
+                    pieData.forEachIndexed { i, (c, v) ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                            Box(Modifier.size(10.dp).background(palette.getOrElse(i) { Color.Gray }, RoundedCornerShape(2.dp)))
+                            Spacer(Modifier.width(6.dp))
+                            Text("${c}：¥%.2f".format(v), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         }
         Spacer(Modifier.height(Dimen.s12))
