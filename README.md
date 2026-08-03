@@ -1,4 +1,4 @@
-# LifeBench 生活工作台
+# 小满（LifeBench）
 
 一个**纯本地、零广告、离线可用**的 Android 生活效率工作台。所有数据保存在本机（Room 数据库 + DataStore + 内部文件），不依赖任何云端账号。
 
@@ -18,9 +18,18 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.7`（`versionCode 10507`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.9`（`versionCode 10509`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.9 (2026-08-03, patch) — 图标严格对齐模板 + 全站品牌统一
+- **图标**：将 `lifebench-icon-premium.html` 的「四瓣珐琅」SVG 直接栅格化为 1024×1024 PNG，与模板**像素级一致**（蔷薇粉渐变 #EC7BA3→#D6497F→#A8305F + 右上 radial 高光 + 花瓣暖白→浅粉 #FFFFFF→#F4E7EC 渐变 + 白色高光椭圆）；替代 v1.5.8 的 AI 近似图。
+- **全站品牌统一**：关于页（ProfileScreen）、下载发布页（index.html）、README 的旧名字「全能生活工作台 / 生活标杆」与旧图标全部替换为「小满 + 四瓣珐琅」；版本号同步至 v1.5.9。
+
+### v1.5.8 (2026-08-03, patch) — 图标还原
+- **修复**：v1.5.7 矢量图标因 AAPT2 渐变限制退化为纯色，与候选预览不一致
+- 用候选高清 PNG（1024×1024）直接作为自适应图标背景，100% 还原珐琅釉光质感
+- 清除 AI 生成水印（右下角梯度插值覆盖）
 
 ### v1.5.7 (2026-08-03, minor — 品牌升级)
 - **品牌图标**：全新四瓣珐琅花自适应图标（VectorDrawable），蔷薇粉 #D6497F 品牌底色 + 右上釉面高光，暖白花瓣（绕中心 4×旋转）+ 柔接触投影 + 瓣尖高光。四瓣对应四大模块（工作台/专注/工具/我的），暗合「四象限」哲学。

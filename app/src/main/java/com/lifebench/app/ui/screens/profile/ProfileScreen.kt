@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -20,6 +21,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.lifebench.app.data.Repo
 import com.lifebench.app.navigation.Routes
+import com.lifebench.app.R
 import com.lifebench.app.ui.components.*
 import com.lifebench.app.ui.theme.Dimen
 import com.lifebench.app.util.BackupUtil
@@ -116,12 +118,21 @@ fun ProfileScreen(nav: NavController) {
         Spacer(Modifier.height(Dimen.s12))
         // 关于
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-            Text("关于", style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(R.drawable.ic_launcher_art),
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(Modifier.width(Dimen.s12))
+                Column {
+                    Text("关于", style = MaterialTheme.typography.titleMedium)
+                    Text("小满 v1.5.9", fontWeight = FontWeight.SemiBold)
+                }
+            }
             Spacer(Modifier.height(Dimen.s8))
-            Text("LifeBench 个人全能生活工作台 v1.5.3", fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(Dimen.s4))
             Text("离线优先 · 无广告 · 数据本地加密存储", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("四大主导航：首页总览 / 专注空间（番茄钟·睡眠·饮食·习惯）/ 工具箱（待办·记账·密码箱·笔记·纪念日·舒尔特）/ 个人中心。全部数据仅存于本机。",
+            Text("四大主导航：工作台总览 / 专注空间（番茄钟·睡眠·饮食·习惯）/ 工具箱（待办·记账·密码箱·笔记·纪念日·舒尔特）/ 个人中心。全部数据仅存于本机。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Dimen.s24))
