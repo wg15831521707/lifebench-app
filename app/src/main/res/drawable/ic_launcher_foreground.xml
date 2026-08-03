@@ -1,13 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 四瓣珐琅花前景 · 小满 LifeBench -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- 圆形外环 + 对勾：表达“生活工作台 · 今日事今日毕”，白色描边在主题色背景上更精致 -->
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="7"
-          android:strokeLineCap="round" android:strokeLineJoin="round"
-          android:pathData="M54,20 A34,34 0 1,0 54,88 A34,34 0 1,0 54,20 Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="10"
-          android:strokeLineCap="round" android:strokeLineJoin="round"
-          android:pathData="M39,55 L50,66 L71,41" />
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+
+    <!-- 柔接触投影：花瓣下方，让图标「浮起来」 -->
+    <path android:pathData="M30,66 Q54,76 78,66 Q78,74 54,78 Q30,74 30,66 Z" android:fillColor="#1A000000"/>
+
+    <!-- 四瓣花：每瓣暖白色，绕中心(54,54)旋转 -->
+    <group android:pivotX="54" android:pivotY="54" android:rotation="0">
+        <path android:pathData="M54,28 C63,28 70,36 68,48 C66,55 58,57 54,54 C50,57 42,55 40,48 C38,36 45,28 54,28 Z"
+              android:fillColor="#FFF5F7"/>
+        <!-- 瓣尖釉光高光 -->
+        <path android:pathData="M55,32 Q60,35 62,42 Q58,38 55,36 Z" android:fillColor="#33FFFFFF"/>
+    </group>
+
+    <group android:pivotX="54" android:pivotY="54" android:rotation="90">
+        <path android:pathData="M54,28 C63,28 70,36 68,48 C66,55 58,57 54,54 C50,57 42,55 40,48 C38,36 45,28 54,28 Z"
+              android:fillColor="#FFF5F7"/>
+        <path android:pathData="M55,32 Q60,35 62,42 Q58,38 55,36 Z" android:fillColor="#33FFFFFF"/>
+    </group>
+
+    <group android:pivotX="54" android:pivotY="54" android:rotation="180">
+        <path android:pathData="M54,28 C63,28 70,36 68,48 C66,55 58,57 54,54 C50,57 42,55 40,48 C38,36 45,28 54,28 Z"
+              android:fillColor="#FFF5F7"/>
+        <path android:pathData="M55,32 Q60,35 62,42 Q58,38 55,36 Z" android:fillColor="#33FFFFFF"/>
+    </group>
+
+    <group android:pivotX="54" android:pivotY="54" android:rotation="270">
+        <path android:pathData="M54,28 C63,28 70,36 68,48 C66,55 58,57 54,54 C50,57 42,55 40,48 C38,36 45,28 54,28 Z"
+              android:fillColor="#FFF5F7"/>
+        <path android:pathData="M55,32 Q60,35 62,42 Q58,38 55,36 Z" android:fillColor="#33FFFFFF"/>
+    </group>
+
+    <!-- 花心微光点 -->
+    <path android:pathData="M54,51 A3,3 0 1,1 54,57 A3,3 0 1,1 54,51 Z" android:fillColor="#22FFFFFF"/>
+
 </vector>
