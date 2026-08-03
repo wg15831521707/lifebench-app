@@ -64,13 +64,6 @@ import androidx.activity.result.contract.ActivityResultContracts
  */
 
 // ——— 工具枢纽（重设计：分类双列网格）———
-private data class ToolMeta(
-    val label: String,
-    val desc: String,
-    val icon: ImageVector,
-    val route: String,
-    val accent: Int,
-)
 
 /** 区块标题（带语义色小图标）。 */
 @Composable
@@ -82,32 +75,6 @@ private fun HubSectionHeader(text: String, icon: ImageVector) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(Dimen.s6))
         Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-/** 工具卡片：语义色图标芯片 + 标题 + 一句说明 + 右箭头，双列等宽。 */
-@Composable
-private fun ToolTile(meta: ToolMeta, onClick: () -> Unit) {
-    val (container, tint) = chipTint(meta.accent)
-    AppCard(onClick = onClick) {
-        Surface(
-            shape = RoundedCornerShape(12.dp), color = container,
-            modifier = Modifier.size(44.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) { Icon(meta.icon, null, tint = tint, modifier = Modifier.size(24.dp)) }
-        }
-        Spacer(Modifier.height(Dimen.s8))
-        Text(meta.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.height(2.dp))
-        Text(
-            meta.desc, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(Dimen.s8))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-        }
     }
 }
 

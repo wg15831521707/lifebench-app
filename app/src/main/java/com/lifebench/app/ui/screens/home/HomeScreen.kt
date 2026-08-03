@@ -2,9 +2,6 @@ package com.lifebench.app.ui.screens.home
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,6 +34,8 @@ import com.lifebench.app.ui.components.CountUpText
 import com.lifebench.app.ui.components.HeroCard
 import com.lifebench.app.ui.components.MetricLine
 import com.lifebench.app.ui.components.SectionHeader
+import com.lifebench.app.ui.components.ToolMeta
+import com.lifebench.app.ui.components.ToolTile
 import com.lifebench.app.ui.components.chipTint
 import com.lifebench.app.ui.components.reveal
 import com.lifebench.app.ui.theme.Dimen
@@ -304,31 +303,20 @@ fun HomeScreen(nav: NavController) {
         SectionHeader("全部工具")
 
         Spacer(Modifier.height(Dimen.s8))
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimen.s16).heightIn(max = 360.dp),
-            verticalArrangement = Arrangement.spacedBy(Dimen.s12),
-            horizontalArrangement = Arrangement.spacedBy(Dimen.s12)
+        // 全部工具：复用 ToolTile（与专注/工具页一致的双列卡片风格），9 个工具全部可达。
+        // 用普通 Column + 每行 2 个 ToolTile 排版，避免 LazyVerticalGrid 嵌套在滚动 Column 内的裁剪/内层滚动问题。
+        val toolRows = homeToolMetas.chunked(2)
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
+            verticalArrangement = Arrangement.spacedBy(Dimen.s12)
         ) {
-            items(quickEntries.size) { i ->
-                val e = quickEntries[i]
-                val (c, t) = chipTint(i)
-                Column(
-                    Modifier.clickable { nav.navigate(e.route) }.padding(Dimen.s6),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.large,
-                        color = c,
-                        shadowElevation = 2.dp,
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(e.icon, contentDescription = e.label, tint = t, modifier = Modifier.size(28.dp))
-                        }
+            toolRows.forEach { rowItems ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimen.s12)) {
+                    rowItems.forEach { meta ->
+                        Box(Modifier.weight(1f)) { ToolTile(meta) { nav.navigate(meta.route) } }
                     }
-                    Spacer(Modifier.height(6.dp))
-                    Text(e.label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                    // 奇数最后一个单元格单独成行时，右侧补占位保持左对齐
+                    if (rowItems.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }
@@ -524,17 +512,17 @@ private fun HubShortcut(
     }
 }
 
-private data class Quick(val label: String, val icon: ImageVector, val route: String)
-private val quickEntries = listOf(
-    Quick("番茄钟", Icons.Filled.Alarm, Routes.FOCUS),
-    Quick("待办", Icons.Filled.Checklist, Routes.TODO),
-    Quick("记账", Icons.Filled.AccountBalanceWallet, Routes.ACCOUNT),
-    Quick("睡眠", Icons.Filled.Bedtime, Routes.SLEEP),
-    Quick("饮食", Icons.Filled.Restaurant, Routes.DIET),
-    Quick("舒尔特", Icons.Filled.GridView, Routes.SCHULTE),
-    Quick("笔记", Icons.Filled.Note, Routes.NOTE),
-    Quick("密码箱", Icons.Filled.Lock, Routes.PASSWORD),
-    Quick("纪念日", Icons.Filled.Celebration, Routes.ANNIVERSARY),
+/** 首页「全部工具」：与专注/工具页一致的双列卡片（ToolTile），全部工具可达。 */
+private val homeToolMetas = listOf(
+    ToolMeta("番茄钟", "专注计时", Icons.Filled.Alarm, Routes.FOCUS, 0),
+    ToolMeta("待办", "四象限，分清轻重缓急", Icons.Filled.Checklist, Routes.TODO, 0),
+    ToolMeta("记账", "随手记，掌控每一笔", Icons.Filled.AccountBalanceWallet, Routes.ACCOUNT, 1),
+    ToolMeta("睡眠", "作息记录", Icons.Filled.Bedtime, Routes.SLEEP, 2),
+    ToolMeta("饮食", "三餐记录", Icons.Filled.Restaurant, Routes.DIET, 1),
+    ToolMeta("舒尔特", "训练专注力与反应", Icons.Filled.GridView, Routes.SCHULTE, 2),
+    ToolMeta("笔记", "灵感随时记录", Icons.Filled.Note, Routes.NOTE, 0),
+    ToolMeta("密码箱", "加密保管账号密码", Icons.Filled.Lock, Routes.PASSWORD, 3),
+    ToolMeta("纪念日", "重要日子不错过", Icons.Filled.Celebration, Routes.ANNIVERSARY, 1),
 )
 
 // 小工具：睡眠时长展示

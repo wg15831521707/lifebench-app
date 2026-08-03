@@ -9,7 +9,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -53,29 +52,19 @@ fun AppNav() {
     Scaffold(
         bottomBar = {
             if (showBottom) {
-                NavigationBar {
-                    val currentRouteStr = backStack?.destination?.route
-                    BottomTabs.forEach { tab ->
-                        val selected = currentRouteStr == tab.route
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                nav.navigate(tab.route) {
-                                    // 切换主导航时弹出到起点并保存状态，避免栈堆积
-                                    popUpTo(nav.graph.startDestinationRoute ?: Routes.HOME) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
-                            label = { Text(tab.label) },
-                            // 仅图标/文字变色，不显示背景色块
-                            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
-                        )
+                BottomNavigationBar(
+                    currentRoute = backStack?.destination?.route,
+                    onTabSelected = { tab ->
+                        nav.navigate(tab.route) {
+                            // 切换主导航时弹出到起点并保存状态，避免栈堆积
+                            popUpTo(nav.graph.startDestinationRoute ?: Routes.HOME) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
-                }
+                )
             }
         }
     ) { pad ->
