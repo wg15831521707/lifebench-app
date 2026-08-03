@@ -1,53 +1,58 @@
 package com.lifebench.app.ui.screens.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lifebench.app.data.entity.TodoEntity
-import com.lifebench.app.ui.theme.LocalQuadrantColors
-import com.lifebench.app.ui.theme.LocalExtraColors
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.lifebench.app.data.Repo
+import com.lifebench.app.data.entity.TodoEntity
 import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.AppCard
 import com.lifebench.app.ui.components.AppTopBar
 import com.lifebench.app.ui.components.ConfirmDeleteDialog
-import com.lifebench.app.ui.components.CountUpText
 import com.lifebench.app.ui.components.HeroCard
 import com.lifebench.app.ui.components.MetricLine
 import com.lifebench.app.ui.components.SectionHeader
 import com.lifebench.app.ui.components.ToolMeta
 import com.lifebench.app.ui.components.ToolTile
-import com.lifebench.app.ui.components.chipTint
 import com.lifebench.app.ui.components.reveal
 import com.lifebench.app.ui.theme.Dimen
+import com.lifebench.app.ui.theme.LocalExtraColors
+import com.lifebench.app.ui.theme.LocalQuadrantColors
 import com.lifebench.app.ui.theme.ThemeMode
 import com.lifebench.app.util.CalcUtil
 import com.lifebench.app.util.TimeUtil
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * 首页数据仪表盘：聚合今日专注、睡眠概况、本周收支，并提供快捷入口。
+ *
+ * 性能说明：工作台内容随使用增长（待办 / 习惯 / 已完成 越来越多），
+ * 为避免单个竖向滚动 Column 把整页一次性测量 + 任意 flow 变更就重排整页，
+ * 这里改用 LazyColumn（仅合成/测量可视区）+ 各区块抽成独立形参化 Composable
+ * （某条 flow 变化只重排受影响区块），从根本上消除长页卡顿。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +65,7 @@ fun HomeScreen(nav: NavController) {
     val habits by Repo.habit.observeActiveHabits().collectAsStateWithLifecycle(emptyList())
     val allCheckIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
 
-    // 今日专注时长 & 本周支出：直接订阅 Room Flow，回到首页自动刷新（不再因 LaunchedEffect(Unit) 而陈旧）
+    // 今日专注时长 & 本周支出：直接订阅 Room Flow，回到首页自动刷新
     val now = System.currentTimeMillis()
     val dayStart = TimeUtil.dayKey(now)
     val focusMin by Repo.focus.focusMinutesBetweenFlow(dayStart, now + 1)
@@ -72,19 +77,23 @@ fun HomeScreen(nav: NavController) {
     val weekExpense by Repo.account.sumByTypeFlow(0, weekStart, weekEnd)
         .collectAsStateWithLifecycle(initialValue = 0.0)
 
-    val todayKey = TimeUtil.dayKey()
-    val todayHabitChecked = allCheckIns.count { it.date == todayKey }
-    val byHabit = allCheckIns.groupBy { it.habitId }.mapValues { m -> m.value.map { it.date }.toSet() }
-    val longestStreak = habits.maxOfOrNull { computeStreak(byHabit[it.id] ?: emptySet()) } ?: 0
-    val streakMilestone = when {
-        longestStreak >= 365 -> 365
-        longestStreak >= 100 -> 365
-        longestStreak >= 30 -> 100
-        longestStreak >= 7 -> 30
-        else -> 7
+    // 习惯连续打卡派生量：仅在 habits / allCheckIns 变化时才重算，避免无关 flow 触发时重复计算长列表
+    val streakInfo = remember(habits, allCheckIns) {
+        val todayKey = TimeUtil.dayKey()
+        val byHabit = allCheckIns.groupBy { it.habitId }.mapValues { m -> m.value.map { it.date }.toSet() }
+        val longest = habits.maxOfOrNull { computeStreak(byHabit[it.id] ?: emptySet()) } ?: 0
+        val milestone = when {
+            longest >= 365 -> 365
+            longest >= 100 -> 365
+            longest >= 30 -> 100
+            longest >= 7 -> 30
+            else -> 7
+        }
+        val progress = (longest.toFloat() / milestone).coerceIn(0f, 1f)
+        val remain = (milestone - longest).coerceAtLeast(0)
+        val todayChecked = allCheckIns.count { it.date == todayKey }
+        StreakInfo(longest, milestone, progress, remain, todayChecked)
     }
-    val streakProgress = (longestStreak.toFloat() / streakMilestone).coerceIn(0f, 1f)
-    val streakRemain = (streakMilestone - longestStreak).coerceAtLeast(0)
 
     val lastSleep = recentSleep.firstOrNull()
     val sleepHoursText = lastSleep?.let { CalcUtil.fmtSleep(it.durationMin) } ?: "未记录"
@@ -92,189 +101,102 @@ fun HomeScreen(nav: NavController) {
         when (it) { 1 -> "差"; 2 -> "中"; 3 -> "好"; else -> null }
     }
 
-    // 今日日期：另起一个 cal（weekStart 用的 cal 已被设成周一，year/month 都不是今天）
+    // 今日日期
     val todayCal = remember { Calendar.getInstance() }
     val year = todayCal.get(Calendar.YEAR)
     val weekday = SimpleDateFormat("EEEE", Locale.CHINA).format(todayCal.time)
     val dateStr = "${todayCal.get(Calendar.MONTH) + 1}月${todayCal.get(Calendar.DAY_OF_MONTH)}日"
-    // 问候语：按当前小时分段，建立 Hero 第一层级的亲切感
     val hour = todayCal.get(Calendar.HOUR_OF_DAY)
     val greetWord = when {
         hour < 5 -> "夜深了"; hour < 11 -> "早上好"; hour < 14 -> "中午好"
         hour < 18 -> "下午好"; hour < 22 -> "晚上好"; else -> "夜深了"
     }
     val greetText = "$greetWord，王浩"
-    // 每日一语：以「日期」为随机种子，当天稳定、跨天换新（不按天序号循环，池大小无关）
+    // 每日一语：以「日期」为随机种子，当天稳定、跨天换新
     val daySeed = (todayCal.get(Calendar.YEAR) * 10000L
             + (todayCal.get(Calendar.MONTH) + 1) * 100L
             + todayCal.get(Calendar.DAY_OF_MONTH)).toLong()
     val quote = DAILY_QUOTES[kotlin.random.Random(daySeed).nextInt(DAILY_QUOTES.size)]
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AppTopBar(
-            title = "工作台",
-            actions = {
-                IconButton(onClick = {
-                    val next = when (themeMode) {
-                        "SYSTEM" -> "LIGHT"; "LIGHT" -> "DARK"; else -> "SYSTEM"
+    val toolRows = remember { homeToolMetas.chunked(2) }
+
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            AppTopBar(
+                title = "工作台",
+                actions = {
+                    IconButton(onClick = {
+                        val next = when (themeMode) {
+                            "SYSTEM" -> "LIGHT"; "LIGHT" -> "DARK"; else -> "SYSTEM"
+                        }
+                        scope.launch { Repo.settings.setThemeMode(next) }
+                    }) {
+                        Icon(
+                            if (themeMode == "DARK") Icons.Filled.LightMode else Icons.Filled.DarkMode,
+                            contentDescription = "主题切换"
+                        )
                     }
-                    scope.launch { Repo.settings.setThemeMode(next) }
-                }) {
-                    Icon(
-                        if (themeMode == "DARK") Icons.Filled.LightMode else Icons.Filled.DarkMode,
-                        contentDescription = "主题切换"
-                    )
                 }
-            }
-        )
+            )
+        }
 
-        Spacer(Modifier.height(Dimen.s12))
-        // 顶部 Hero 锚点（设计系统第一层级）：问候 + 日期 + 头像 + 当日专注环形
-        HeroCard(
-            greeting = greetText,
-            date = "$year 年 · $weekday · $dateStr",
-            avatarText = "浩",
-            focusMin = focusMin,
-            focusTarget = 120,
-            modifier = Modifier.padding(horizontal = Dimen.s16).reveal(0)
-        )
+        item { Spacer(Modifier.height(Dimen.s12)) }
+        // 顶部 Hero 锚点：问候 + 日期 + 头像 + 当日专注环形
+        item {
+            HeroCard(
+                greeting = greetText,
+                date = "$year 年 · $weekday · $dateStr",
+                avatarText = "浩",
+                focusMin = focusMin,
+                focusTarget = 120,
+                modifier = Modifier.padding(horizontal = Dimen.s16).reveal(0)
+            )
+        }
 
-        Spacer(Modifier.height(Dimen.s12))
+        item { Spacer(Modifier.height(Dimen.s12)) }
         // 每日一语
-        AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(1)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.FormatQuote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    }
-                }
-                Spacer(Modifier.width(Dimen.s12))
-                Column(Modifier.weight(1f)) {
-                    Text("每日一语", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                    Text("$year 年 · $weekday · $dateStr", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Spacer(Modifier.height(Dimen.s12))
-            Text("「${quote.first}」", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-            Text(quote.second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-        }
+        item { HomeQuoteCard(quote = quote, year = year, weekday = weekday, dateStr = dateStr) }
 
-        Spacer(Modifier.height(Dimen.s12))
-        // 今日概览（设计系统统一分组）：与模板一致，KPI 胶囊归入「今日概览」区块标题下
-        SectionHeader("今日概览", moreLabel = "查看", onMore = { nav.navigate(Routes.FOCUS) })
-        Spacer(Modifier.height(Dimen.s8))
-        // 统计胶囊：今日专注 + 睡眠概况。Row 用 IntrinsicSize.Min 让两盒等高，
-        // 避免"5h20m·中"长文本换行后两盒高度不一致。
-        Row(
-            Modifier.padding(horizontal = Dimen.s16).height(IntrinsicSize.Min).reveal(2)
-        ) {
-            MetricCapsule(
-                icon = Icons.Filled.PlayArrow, label = "今日专注", value = "${focusMin} 分",
-                actionText = "开始专注", onAction = { nav.navigate(Routes.FOCUS) },
-                modifier = Modifier.weight(1f).padding(end = Dimen.s6).fillMaxHeight()
-            )
-            MetricCapsule(
-                icon = Icons.Filled.Bedtime, label = "睡眠概况", value = sleepHoursText,
-                actionText = "去记录", onAction = { nav.navigate(Routes.SLEEP) },
-                modifier = Modifier.weight(1f).padding(start = Dimen.s6).fillMaxHeight(),
-                // 把「差/中/好」质量 chip 放到 value 下方独立一行，避免「5h3m」被截成「5h...」
-                quality = sleepQuality
+        item { Spacer(Modifier.height(Dimen.s12)) }
+        // 今日概览（设计系统统一分组）：KPI 胶囊归入「今日概览」区块标题下
+        item {
+            HomeOverviewSection(
+                focusMin = focusMin,
+                sleepHoursText = sleepHoursText,
+                sleepQuality = sleepQuality,
+                weekExpense = weekExpense,
+                nav = nav
             )
         }
 
-        Spacer(Modifier.height(Dimen.s12))
-
-        // 本周支出
-        MetricCapsule(
-            icon = Icons.Filled.AccountBalanceWallet, label = "本周支出", value = "¥%.1f".format(weekExpense),
-            valueColor = MaterialTheme.colorScheme.error, actionText = "记账", onAction = { nav.navigate(Routes.ACCOUNT) },
-            modifier = Modifier.padding(horizontal = Dimen.s16).reveal(3)
-        )
-
-        Spacer(Modifier.height(Dimen.s16))
+        item { Spacer(Modifier.height(Dimen.s16)) }
         // 首页习惯连续打卡：单张「连续打卡」卡（对应模板 .streak 布局）
-        // 左侧大数字「最长连续 X 天」+ 右侧今日打卡/里程碑 mini + 进度条 + 解锁提示，信息密度更合理、视觉更聚焦。
         if (habits.isNotEmpty()) {
-            Spacer(Modifier.height(Dimen.s12))
-            SectionHeader("习惯打卡", moreLabel = "管理", onMore = { nav.navigate(Routes.HABIT) })
-            Spacer(Modifier.height(Dimen.s8))
-            AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(4)) {
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-                    // 左：最长连续大数字（success 语义色，与模板一致）
-                    Surface(
-                        shape = RoundedCornerShape(Dimen.s12),
-                        color = LocalExtraColors.current.success.copy(alpha = 0.12f),
-                        modifier = Modifier.width(84.dp).fillMaxHeight()
-                    ) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(vertical = Dimen.s12),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text("$longestStreak", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = LocalExtraColors.current.success)
-                            Text("最长连续 (天)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    Spacer(Modifier.width(Dimen.s12))
-                    // 右：今日打卡 / 里程碑 + 进度条 + 提示
-                    Column(Modifier.weight(1f)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimen.s8)) {
-                            Surface(
-                                shape = RoundedCornerShape(Dimen.s8), color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Column(Modifier.fillMaxWidth().padding(Dimen.s8)) {
-                                    Text("$todayHabitChecked / ${habits.size}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                    Text("今日打卡", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(Dimen.s8), color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Column(Modifier.fillMaxWidth().padding(Dimen.s8)) {
-                                    Text("$streakMilestone", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                    Text("里程碑 (天)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(Dimen.s8))
-                        LinearProgressIndicator(
-                            progress = { streakProgress },
-                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                            color = LocalExtraColors.current.success,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                        Spacer(Modifier.height(Dimen.s6))
-                        Text(
-                            if (longestStreak >= streakMilestone) "已达成 $streakMilestone 天连续目标！"
-                            else "再坚持 $streakRemain 天，解锁 $streakMilestone 天连续 🎉",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            item { Spacer(Modifier.height(Dimen.s12)) }
+            item { SectionHeader("习惯打卡", moreLabel = "管理", onMore = { nav.navigate(Routes.HABIT) }) }
+            item { Spacer(Modifier.height(Dimen.s8)) }
+            item {
+                HomeStreakCard(
+                    info = streakInfo,
+                    habitsSize = habits.size
+                )
             }
         }
 
-        Spacer(Modifier.height(Dimen.s16))
+        item { Spacer(Modifier.height(Dimen.s16)) }
         // 待办四象限「田」字格
-        SectionHeader("待办四象限", moreLabel = "管理", onMore = { nav.navigate(Routes.TODO) })
-        Spacer(Modifier.height(Dimen.s8))
-        TodoQuadrantGrid(
-            todos = todos,
-            onCellClick = { nav.navigate(Routes.TODO) },
-            onCheck = { t -> scope.launch { Repo.todo.update(t.copy(done = true, archived = true)) } }
-        )
+        item {
+            HomeQuadrantSection(todos = todos, nav = nav, scope = scope)
+        }
 
-        Spacer(Modifier.height(Dimen.s12))
-        // 已完成列表：可删除 / 恢复未完成
         if (archived.isNotEmpty()) {
-            Text("  已完成（${archived.size}）", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = Dimen.s16))
-            Spacer(Modifier.height(Dimen.s8))
-            archived.forEach { t ->
+            item { Spacer(Modifier.height(Dimen.s12)) }
+            item {
+                Text("  已完成（${archived.size}）", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = Dimen.s16))
+            }
+            item { Spacer(Modifier.height(Dimen.s8)) }
+            // 已完成列表：虚拟化为 LazyColumn 子项，随数量增长不拖慢整页
+            items(archived, key = { it.id }) { t ->
                 var showDel by remember { mutableStateOf(false) }
                 AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s8)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -289,38 +211,162 @@ fun HomeScreen(nav: NavController) {
             }
         }
 
-        Spacer(Modifier.height(Dimen.s16))
-        // 快捷跳转：两大枢纽
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
-            horizontalArrangement = Arrangement.spacedBy(Dimen.s12)
-        ) {
-            HubShortcut("专注空间", Icons.Filled.Spa, "番茄钟 · 睡眠 · 饮食 · 习惯", Routes.FOCUS_HUB, nav, Modifier.weight(1f), 0)
-            HubShortcut("工具箱", Icons.Filled.Widgets, "待办 · 记账 · 笔记 · 更多", Routes.TOOLS, nav, Modifier.weight(1f), 1)
+        item { Spacer(Modifier.height(Dimen.s16)) }
+        // 全部工具：复用 ToolTile（与专注/工具页一致的双列卡片风格），9 个工具全部可达
+        item { SectionHeader("全部工具") }
+        item { Spacer(Modifier.height(Dimen.s8)) }
+        itemsIndexed(toolRows) { idx, rowItems ->
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
+                horizontalArrangement = Arrangement.spacedBy(Dimen.s12)
+            ) {
+                rowItems.forEach { meta ->
+                    Box(Modifier.weight(1f)) { ToolTile(meta) { nav.navigate(meta.route) } }
+                }
+                // 奇数最后一个单元格单独成行时，右侧补占位保持左对齐
+                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+            }
+            if (idx < toolRows.lastIndex) Spacer(Modifier.height(Dimen.s12))
         }
+        item { Spacer(Modifier.height(Dimen.s24)) }
+    }
+}
 
-        Spacer(Modifier.height(Dimen.s16))
-        SectionHeader("全部工具")
-
-        Spacer(Modifier.height(Dimen.s8))
-        // 全部工具：复用 ToolTile（与专注/工具页一致的双列卡片风格），9 个工具全部可达。
-        // 用普通 Column + 每行 2 个 ToolTile 排版，避免 LazyVerticalGrid 嵌套在滚动 Column 内的裁剪/内层滚动问题。
-        val toolRows = homeToolMetas.chunked(2)
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = Dimen.s16),
-            verticalArrangement = Arrangement.spacedBy(Dimen.s12)
-        ) {
-            toolRows.forEach { rowItems ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimen.s12)) {
-                    rowItems.forEach { meta ->
-                        Box(Modifier.weight(1f)) { ToolTile(meta) { nav.navigate(meta.route) } }
-                    }
-                    // 奇数最后一个单元格单独成行时，右侧补占位保持左对齐
-                    if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+/** 每日一语卡片。 */
+@Composable
+private fun HomeQuoteCard(quote: Pair<String, String>, year: Int, weekday: String, dateStr: String) {
+    AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(0)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.FormatQuote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 }
             }
+            Spacer(Modifier.width(Dimen.s12))
+            Column(Modifier.weight(1f)) {
+                Text("每日一语", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                Text("$year 年 · $weekday · $dateStr", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
-        Spacer(Modifier.height(Dimen.s24))
+        Spacer(Modifier.height(Dimen.s12))
+        Text("「${quote.first}」", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Text(quote.second, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/** 今日概览：今日专注 + 睡眠概况 + 本周支出 三块 KPI。 */
+@Composable
+private fun HomeOverviewSection(
+    focusMin: Int,
+    sleepHoursText: String,
+    sleepQuality: String?,
+    weekExpense: Double,
+    nav: NavController
+) {
+    Column(Modifier.reveal(0)) {
+        SectionHeader("今日概览", moreLabel = "查看", onMore = { nav.navigate(Routes.FOCUS) })
+        Spacer(Modifier.height(Dimen.s8))
+        // 统计胶囊：Row 用 IntrinsicSize.Min 让两盒等高
+        Row(
+            Modifier.padding(horizontal = Dimen.s16).height(IntrinsicSize.Min)
+        ) {
+            MetricCapsule(
+                icon = Icons.Filled.PlayArrow, label = "今日专注", value = "${focusMin} 分",
+                actionText = "开始专注", onAction = { nav.navigate(Routes.FOCUS) },
+                modifier = Modifier.weight(1f).padding(end = Dimen.s6).fillMaxHeight()
+            )
+            MetricCapsule(
+                icon = Icons.Filled.Bedtime, label = "睡眠概况", value = sleepHoursText,
+                actionText = "去记录", onAction = { nav.navigate(Routes.SLEEP) },
+                modifier = Modifier.weight(1f).padding(start = Dimen.s6).fillMaxHeight(),
+                // 把「差/中/好」质量 chip 放到 value 下方独立一行，避免「5h3m」被截成「5h...」
+                quality = sleepQuality
+            )
+        }
+        Spacer(Modifier.height(Dimen.s12))
+        MetricCapsule(
+            icon = Icons.Filled.AccountBalanceWallet, label = "本周支出", value = "¥%.1f".format(weekExpense),
+            valueColor = MaterialTheme.colorScheme.error, actionText = "记账", onAction = { nav.navigate(Routes.ACCOUNT) },
+            modifier = Modifier.padding(horizontal = Dimen.s16)
+        )
+    }
+}
+
+/** 首页习惯连续打卡卡（对应模板 .streak 布局）。 */
+@Composable
+private fun HomeStreakCard(info: StreakInfo, habitsSize: Int) {
+    AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(0)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            // 左：最长连续大数字
+            Surface(
+                shape = RoundedCornerShape(Dimen.s12),
+                color = LocalExtraColors.current.success.copy(alpha = 0.12f),
+                modifier = Modifier.width(84.dp).fillMaxHeight()
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(vertical = Dimen.s12),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text("${info.longest}", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = LocalExtraColors.current.success)
+                    Text("最长连续 (天)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.width(Dimen.s12))
+            // 右：今日打卡 / 里程碑 + 进度条 + 提示
+            Column(Modifier.weight(1f)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimen.s8)) {
+                    Surface(
+                        shape = RoundedCornerShape(Dimen.s8), color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(Dimen.s8)) {
+                            Text("${info.todayChecked} / $habitsSize", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("今日打卡", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(Dimen.s8), color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(Dimen.s8)) {
+                            Text("${info.milestone}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("里程碑 (天)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(Dimen.s8))
+                LinearProgressIndicator(
+                    progress = { info.progress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    color = LocalExtraColors.current.success,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+                Spacer(Modifier.height(Dimen.s6))
+                Text(
+                    if (info.longest >= info.milestone) "已达成 ${info.milestone} 天连续目标！"
+                    else "再坚持 ${info.remain} 天，解锁 ${info.milestone} 天连续 🎉",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/** 待办四象限「田」字格区块。 */
+@Composable
+private fun HomeQuadrantSection(todos: List<TodoEntity>, nav: NavController, scope: CoroutineScope) {
+    Column {
+        SectionHeader("待办四象限", moreLabel = "管理", onMore = { nav.navigate(Routes.TODO) })
+        Spacer(Modifier.height(Dimen.s8))
+        TodoQuadrantGrid(
+            todos = todos,
+            onCellClick = { nav.navigate(Routes.TODO) },
+            onCheck = { t -> scope.launch { Repo.todo.update(t.copy(done = true, archived = true)) } }
+        )
     }
 }
 
@@ -437,9 +483,7 @@ private fun QuadrantCell(
             }
             Spacer(Modifier.height(10.dp))
             if (items.isEmpty()) {
-                // 简化空态：仅一行轻提示「暂无任务 · 立即处理/安排时间/…」。
-                // 原本的「+ 点此添加任务」圆形图标+文字与「立即处理」hint 在同一格内重复出现，
-                // 视觉嘈杂、占位冗余；整格已可点击进入待办页，用户自然能完成添加。
+                // 简化空态：仅一行轻提示「暂无任务 · 立即处理/安排时间/…」。未恢复「＋ 点此添加任务」。
                 Text("暂无任务", fontSize = 12.sp, color = info.text.copy(alpha = 0.72f))
             } else {
                 items.forEach { t ->
@@ -481,36 +525,14 @@ private data class QuadrantInfo(
     val text: Color
 )
 
-/** 首页枢纽快捷卡：大图标芯片 + 标题 + 副标题，一键进入对应主导航。 */
-@Composable
-private fun HubShortcut(
-    label: String, icon: ImageVector, desc: String, route: String,
-    nav: NavController, modifier: Modifier = Modifier, accent: Int
-) {
-    val (c, t) = chipTint(accent)
-    AppCard(modifier = modifier, onClick = {
-        // 必须使用与底部导航一致的导航选项（popUpTo + saveState + launchSingleTop + restoreState），
-        // 否则从首页的快捷入口跳转后，底部导航栏的"首页"再次点击无法正确回弹
-        // （原因：普通 nav.navigate 把目标推入栈顶后，popUpTo(start) 弹不到目标之上的多余项）。
-        nav.navigate(route) {
-            popUpTo(nav.graph.startDestinationRoute ?: Routes.HOME) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
-    }) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(shape = RoundedCornerShape(12.dp), color = c, modifier = Modifier.size(44.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = t, modifier = Modifier.size(24.dp)) }
-            }
-            Spacer(Modifier.width(Dimen.s12))
-            Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
+/** 首页习惯连续打卡派生数据（仅在 habits / allCheckIns 变化时才重算）。 */
+private data class StreakInfo(
+    val longest: Int,
+    val milestone: Int,
+    val progress: Float,
+    val remain: Int,
+    val todayChecked: Int,
+)
 
 /** 首页「全部工具」：与专注/工具页一致的双列卡片（ToolTile），全部工具可达。 */
 private val homeToolMetas = listOf(
