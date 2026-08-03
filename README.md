@@ -18,9 +18,12 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.10`（`versionCode 10510`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.11`（`versionCode 10511`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.11 (2026-08-03, patch) — 桌面图标改为方形 legacy PNG
+- **修复/优化**：桌面/启动器图标由自适应图标（`mipmap-anydpi-v26` 珐琅自适应层）切换为**传统方形 PNG 图标**（各密度 `mipmap-mdpi`…`xxxhdpi` 的 `ic_launcher.png`）。原因：自适应图标的形状（圆角/圆/方）由设备 launcher/ROM 遮罩决定、App 端无法覆盖；MIUI/HyperOS、EMUI 等国产 ROM 对 legacy 图标不做遮罩、按原始方形渲染，故改用方形 PNG 可在这些 ROM 上更接近方图。自适应层已重命名为 `.bak` 可一键还原。关于页（`ProfileScreen`）仍用 `ic_launcher_art` 圆形展示，不受影响。
 
 ### v1.5.10 (2026-08-03, patch) — 关于页图标圆形化
 - **修复/优化**：个人中心「关于」卡片的图标由方形改为**圆形**展示（56dp，`CircleShape` 裁切 + 品牌色细描边），与桌面/启动器自适应图标形态一致；图标素材沿用 v1.5.9 的 1024×1024 四瓣珐琅高清 PNG（`ic_launcher_art`）。
