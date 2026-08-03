@@ -1,9 +1,11 @@
 package com.lifebench.app.ui.screens.profile
 
 import android.widget.Toast
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -11,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -121,13 +124,16 @@ fun ProfileScreen(nav: NavController) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.foundation.Image(
                     painter = painterResource(R.drawable.ic_launcher_art),
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp)
+                    contentDescription = "小满应用图标",
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), CircleShape)
                 )
                 Spacer(Modifier.width(Dimen.s12))
                 Column {
                     Text("关于", style = MaterialTheme.typography.titleMedium)
-                    Text("小满 v1.5.9", fontWeight = FontWeight.SemiBold)
+                    Text("小满 v1.5.10", fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(Modifier.height(Dimen.s8))

@@ -18,9 +18,12 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.9`（`versionCode 10509`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.10`（`versionCode 10510`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.10 (2026-08-03, patch) — 关于页图标圆形化
+- **修复/优化**：个人中心「关于」卡片的图标由方形改为**圆形**展示（56dp，`CircleShape` 裁切 + 品牌色细描边），与桌面/启动器自适应图标形态一致；图标素材沿用 v1.5.9 的 1024×1024 四瓣珐琅高清 PNG（`ic_launcher_art`）。
 
 ### v1.5.9 (2026-08-03, patch) — 图标严格对齐模板 + 全站品牌统一
 - **图标**：将 `lifebench-icon-premium.html` 的「四瓣珐琅」SVG 直接栅格化为 1024×1024 PNG，与模板**像素级一致**（蔷薇粉渐变 #EC7BA3→#D6497F→#A8305F + 右上 radial 高光 + 花瓣暖白→浅粉 #FFFFFF→#F4E7EC 渐变 + 白色高光椭圆）；替代 v1.5.8 的 AI 近似图。
