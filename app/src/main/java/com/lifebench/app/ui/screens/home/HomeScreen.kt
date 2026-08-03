@@ -164,7 +164,9 @@ fun HomeScreen(nav: NavController) {
         }
 
         Spacer(Modifier.height(Dimen.s12))
-
+        // 今日概览（设计系统统一分组）：与模板一致，KPI 胶囊归入「今日概览」区块标题下
+        SectionHeader("今日概览", moreLabel = "查看", onMore = { nav.navigate(Routes.FOCUS) })
+        Spacer(Modifier.height(Dimen.s8))
         // 统计胶囊：今日专注 + 睡眠概况。Row 用 IntrinsicSize.Min 让两盒等高，
         // 避免"5h20m·中"长文本换行后两盒高度不一致。
         Row(
@@ -193,46 +195,68 @@ fun HomeScreen(nav: NavController) {
             modifier = Modifier.padding(horizontal = Dimen.s16).reveal(3)
         )
 
-        // 首页习惯连续打卡入口
+        Spacer(Modifier.height(Dimen.s16))
+        // 首页习惯连续打卡：单张「连续打卡」卡（对应模板 .streak 布局）
+        // 左侧大数字「最长连续 X 天」+ 右侧今日打卡/里程碑 mini + 进度条 + 解锁提示，信息密度更合理、视觉更聚焦。
         if (habits.isNotEmpty()) {
             Spacer(Modifier.height(Dimen.s12))
             SectionHeader("习惯打卡", moreLabel = "管理", onMore = { nav.navigate(Routes.HABIT) })
             Spacer(Modifier.height(Dimen.s8))
-            Row(Modifier.padding(horizontal = Dimen.s16).reveal(4)) {
-                MetricCapsule(
-                    icon = Icons.Filled.CheckCircle, label = "今日打卡", value = "$todayHabitChecked / ${habits.size}",
-                    valueColor = MaterialTheme.colorScheme.primary, actionText = "去打卡", onAction = { nav.navigate(Routes.HABIT) },
-                    modifier = Modifier.weight(1f).padding(end = Dimen.s6)
-                )
-                MetricCapsule(
-                    icon = Icons.Filled.Whatshot, label = "最长连续", value = "$longestStreak 天",
-                    valueColor = LocalExtraColors.current.success, actionText = "查看", onAction = { nav.navigate(Routes.HABIT) },
-                    modifier = Modifier.weight(1f).padding(start = Dimen.s6)
-                )
-            }
-            Spacer(Modifier.height(Dimen.s8))
-            // 连续天数进度条：最长连续天数向里程碑（7/30/100/365）递进
-            AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(5)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Whatshot, contentDescription = null, tint = LocalExtraColors.current.success, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("连续打卡目标", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.weight(1f))
-                    Text("$longestStreak / $streakMilestone 天", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            AppCard(Modifier.padding(horizontal = Dimen.s16).reveal(4)) {
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+                    // 左：最长连续大数字（success 语义色，与模板一致）
+                    Surface(
+                        shape = RoundedCornerShape(Dimen.s12),
+                        color = LocalExtraColors.current.success.copy(alpha = 0.12f),
+                        modifier = Modifier.width(84.dp).fillMaxHeight()
+                    ) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(vertical = Dimen.s12),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text("$longestStreak", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = LocalExtraColors.current.success)
+                            Text("最长连续 (天)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(Modifier.width(Dimen.s12))
+                    // 右：今日打卡 / 里程碑 + 进度条 + 提示
+                    Column(Modifier.weight(1f)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimen.s8)) {
+                            Surface(
+                                shape = RoundedCornerShape(Dimen.s8), color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(Modifier.fillMaxWidth().padding(Dimen.s8)) {
+                                    Text("$todayHabitChecked / ${habits.size}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text("今日打卡", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(Dimen.s8), color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(Modifier.fillMaxWidth().padding(Dimen.s8)) {
+                                    Text("$streakMilestone", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text("里程碑 (天)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(Dimen.s8))
+                        LinearProgressIndicator(
+                            progress = { streakProgress },
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                            color = LocalExtraColors.current.success,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        Spacer(Modifier.height(Dimen.s6))
+                        Text(
+                            if (longestStreak >= streakMilestone) "已达成 $streakMilestone 天连续目标！"
+                            else "再坚持 $streakRemain 天，解锁 $streakMilestone 天连续 🎉",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { streakProgress },
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                    color = LocalExtraColors.current.success,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (longestStreak >= streakMilestone) "已达成 $streakMilestone 天连续目标！"
-                    else "再坚持 $streakRemain 天，解锁 $streakMilestone 天连续",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
 

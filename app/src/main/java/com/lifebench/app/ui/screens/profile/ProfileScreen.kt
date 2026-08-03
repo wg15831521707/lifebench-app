@@ -1,6 +1,7 @@
 package com.lifebench.app.ui.screens.profile
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -75,12 +76,25 @@ fun ProfileScreen(nav: NavController) {
             }
         }
         Spacer(Modifier.height(Dimen.s12))
-        // 快捷设置
-        AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s12), onClick = { nav.navigate(Routes.SETTINGS) }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        // 快捷设置（对应模板「设置」卡：全局设置 + 导出全部备份 两行）
+        AppCard(Modifier.padding(horizontal = Dimen.s16).padding(bottom = Dimen.s12)) {
+            Row(
+                Modifier.fillMaxWidth().clickable { nav.navigate(Routes.SETTINGS) }.padding(vertical = Dimen.s4),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(Icons.Filled.Settings, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(Dimen.s12))
                 Text("全局设置", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = Dimen.s4))
+            Row(
+                Modifier.fillMaxWidth().clickable { exportLauncher.launch("lifebench_backup_${TimeUtil.dayKey()}.json") }.padding(vertical = Dimen.s4),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.FileDownload, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(Dimen.s12))
+                Text("导出全部备份", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Icon(Icons.Filled.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -104,7 +118,7 @@ fun ProfileScreen(nav: NavController) {
         AppCard(Modifier.padding(horizontal = Dimen.s16)) {
             Text("关于", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Dimen.s8))
-            Text("LifeBench 个人全能生活工作台 v1.5.2", fontWeight = FontWeight.SemiBold)
+            Text("LifeBench 个人全能生活工作台 v1.5.3", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(Dimen.s4))
             Text("离线优先 · 无广告 · 数据本地加密存储", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("四大主导航：首页总览 / 专注空间（番茄钟·睡眠·饮食·习惯）/ 工具箱（待办·记账·密码箱·笔记·纪念日·舒尔特）/ 个人中心。全部数据仅存于本机。",
