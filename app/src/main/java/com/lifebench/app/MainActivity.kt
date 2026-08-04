@@ -3,6 +3,7 @@ package com.lifebench.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lifebench.app.data.Repo
@@ -18,6 +19,9 @@ import com.lifebench.app.ui.theme.presetById
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 启用边到边模式：让 Compose 内容延伸到系统栏区域，
+        // 配合 Scaffold 的 contentWindowInsets 自动为状态栏/导航栏预留间距
+        enableEdgeToEdge()
         setContent {
             val themeMode by Repo.settings.themeMode.collectAsStateWithLifecycle("SYSTEM")
             val fontScale by Repo.settings.fontScale.collectAsStateWithLifecycle(1.0f)

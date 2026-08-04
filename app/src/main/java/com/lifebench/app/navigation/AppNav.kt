@@ -4,7 +4,9 @@ import androidx.compose.animation.*
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +52,9 @@ fun AppNav() {
     }
 
     Scaffold(
+        // 仅消费状态栏 insets（顶部间距）；底部导航栏由 BottomNav 自身 .navigationBarsPadding() 处理，
+        // 避免底部双重 padding。启用 edge-to-edge 后，这确保内容不会画到状态栏下面。
+        contentWindowInsets = WindowInsets.statusBars,
         bottomBar = {
             if (showBottom) {
                 BottomNavigationBar(

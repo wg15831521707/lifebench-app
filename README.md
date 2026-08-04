@@ -18,9 +18,15 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.19`（`versionCode 10519`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.20`（`versionCode 10520`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.20 (2026-08-04, patch) — 状态栏遮挡修复：启用 edge-to-edge + 消费状态栏 insets
+- **修复：状态栏被应用内容完全遮挡**（在华为 Nova6 5G / HarmonyOS 4.2 等机型上，时间/电量/信号/通知不可见）。
+- 根因三连：① 主题 `statusBarColor` 为 transparent；② `MainActivity` 未启用边到边模式；③ `AppNav` 的 Scaffold 未消费状态栏 insets（底部导航栏有 padding 但顶部完全没有）。
+- 修复：`MainActivity.onCreate` 加 `enableEdgeToEdge()`；`AppNav` 的 Scaffold 设 `contentWindowInsets = WindowInsets.statusBars`，由 Scaffold 自动为所有页面内容添加状态栏高度的顶部间距。
+- 适配效果：系统状态栏（时间/电量/信号/通知）清晰可见，应用内容整体下移到状态栏下方；暗色模式下状态栏图标自动转亮色。
 
 ### v1.5.19 (2026-08-04, patch) — 「我的」页收敛：备份与关于迁出，去冗余
 
