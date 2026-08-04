@@ -18,9 +18,15 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.17`（`versionCode 10517`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.18`（`versionCode 10518`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.18 (2026-08-04, patch) — 抖音跳转根治「夸克里抖音网页」
+
+- **根因**：v1.5.17 在「以为抖音没装」时会直接 `startActivity(https://...)` 且**没有 setPackage**，系统把链接交给默认浏览器（夸克），于是出现「夸克里打开的抖音网页」。
+- **修复**：重构 `openDouyin` 为「先判已装、再启动」两步——① 先用 `getLaunchIntentForPackage` + `snssdk1128` 探测确认抖音是否已安装并拿到真实包名（已知包 + 动态识别抖音系包，满足「抖音号不写死」）；② 已装抖音则**全部候选 Intent 一律 `setPackage(抖音)` 显式启动**，系统绝不会把链接交给浏览器/夸克；依次尝试搜索深链 → 通用 scheme → 域名 URL，全失败则 `getLaunchIntentForPackage` 拉起 App 首页；③ **仅当确认真的没装抖音**才回退网页版。浏览器关键词黑名单补充 `quark`/`edge`/`baidu` 等作为双保险。
+- **效果**：已装抖音必开 App，彻底告别夸克/网页版。
 
 ### v1.5.17 (2026-08-04, patch) — 抖音跳转兜底加固：浏览器解析一律跳过 + 点击 Toast 诊断
 
