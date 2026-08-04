@@ -18,9 +18,18 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.20`（`versionCode 10520`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.21`（`versionCode 10521`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.21 (2026-08-04, patch) — 视觉与留白优化：暗色切换入卡、查看弱化、零态缩小、全局去冗余标题栏
+- **暗色模式切换移入问候卡**：工作台顶部的月亮/太阳切换按钮从顶部标题行移到「问候卡」右上角，替换原「浩」头像徽章，顶栏更简洁、操作更顺手。
+- **「查看」链接弱化**：各区块 `SectionHeader` 的「查看」由 `labelLarge+SemiBold+primary` 改为 `bodySmall+onSurfaceVariant`，不再与区块标题争夺视觉权重，明确其为辅助操作。
+- **专注圆环零态缩小**：`HeroCard` 的专注圆环在 `focusMin=0` 时尺寸 62dp→40dp、描边 8dp→5dp、文字 `titleMedium`→`bodyMedium`，减少空旷感。
+- **全局顶部/底部留白修复（影响所有 Tab 页）**：
+  - 根因：四个 Tab 页（工作台/专注/工具/我的）各有冗余 `TopAppBar`（「工作台」「专注」「工具」「个人中心」），叠加外层 Scaffold 已有的状态栏 padding → 红框区域 ≈ 状态栏(28dp) + TopAppBar(56dp) + Spacer(12dp) ≈ 96dp 废空白。
+  - 修复：移除四个 Tab 页冗余的 `TopAppBar`/内层 `Scaffold`（底部导航已表明当前位置，无需重复标题栏）；子页（待办/设置等）保留带返回按钮的 `TopAppBar` 不受影响。
+  - 工作台额外优化：底部末端 `Spacer` 由 `s24`→`s8`，收窄内容与导航栏间距。
 
 ### v1.5.20 (2026-08-04, patch) — 状态栏遮挡修复：启用 edge-to-edge + 消费状态栏 insets
 - **修复：状态栏被应用内容完全遮挡**（在华为 Nova6 5G / HarmonyOS 4.2 等机型上，时间/电量/信号/通知不可见）。

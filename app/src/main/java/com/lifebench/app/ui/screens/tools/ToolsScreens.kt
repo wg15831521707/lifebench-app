@@ -97,21 +97,19 @@ fun ToolsHubScreen(nav: NavController) {
     val discover = listOf(
         ToolMeta("抖音热榜", "热门视频一键直达抖音", Icons.Filled.SmartDisplay, Routes.DOUYIN_WALL, 1),
     )
-    Scaffold(topBar = { AppTopBar("工具") }) { pad ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxSize().padding(pad).padding(horizontal = Dimen.s16),
-            verticalArrangement = Arrangement.spacedBy(Dimen.s12),
-            horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
-            contentPadding = PaddingValues(vertical = Dimen.s12)
-        ) {
-            items(1, span = { GridItemSpan(2) }) { HubSectionHeader("效率工具", Icons.Filled.FlashOn) }
-            items(efficiency) { ToolTile(it) { nav.navigate(it.route) } }
-            items(1, span = { GridItemSpan(2) }) { HubSectionHeader("安全与记录", Icons.Filled.VerifiedUser) }
-            items(safety) { ToolTile(it) { nav.navigate(it.route) } }
-            items(1, span = { GridItemSpan(2) }) { HubSectionHeader("发现", Icons.Filled.Explore) }
-            items(discover) { ToolTile(it) { nav.navigate(it.route) } }
-        }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize().padding(horizontal = Dimen.s16),
+        verticalArrangement = Arrangement.spacedBy(Dimen.s12),
+        horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
+        contentPadding = PaddingValues(vertical = Dimen.s12)
+    ) {
+        items(1, span = { GridItemSpan(2) }) { HubSectionHeader("效率工具", Icons.Filled.FlashOn) }
+        items(efficiency) { ToolTile(it) { nav.navigate(it.route) } }
+        items(1, span = { GridItemSpan(2) }) { HubSectionHeader("安全与记录", Icons.Filled.VerifiedUser) }
+        items(safety) { ToolTile(it) { nav.navigate(it.route) } }
+        items(1, span = { GridItemSpan(2) }) { HubSectionHeader("发现", Icons.Filled.Explore) }
+        items(discover) { ToolTile(it) { nav.navigate(it.route) } }
     }
 }
 
@@ -151,34 +149,32 @@ fun FocusHubScreen(nav: NavController) {
         FocusMeta("饮食菜谱", Icons.Filled.Restaurant, Routes.DIET, 1),
         FocusMeta("习惯打卡", Icons.Filled.Repeat, Routes.HABIT, 3),
     )
-    Scaffold(topBar = { AppTopBar("专注") }) { pad ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxSize().padding(pad).padding(horizontal = Dimen.s16),
-            verticalArrangement = Arrangement.spacedBy(Dimen.s12),
-            horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
-            contentPadding = PaddingValues(vertical = Dimen.s12)
-        ) {
-            items(1, span = { GridItemSpan(2) }) {
-                // 顶部焦点面板：渐变强调面板承载今日专注总时长（设计系统「强调面板」层级）
-                GradientPanel {
-                    Text("今日专注", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
-                    Spacer(Modifier.height(4.dp))
-                    Row {
-                        Text("$focusMin", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.alignByBaseline())
-                        Text(" 分钟", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f), modifier = Modifier.alignByBaseline())
-                        Text(" · 目标 120", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.alignByBaseline())
-                    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize().padding(horizontal = Dimen.s16),
+        verticalArrangement = Arrangement.spacedBy(Dimen.s12),
+        horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
+        contentPadding = PaddingValues(vertical = Dimen.s12)
+    ) {
+        items(1, span = { GridItemSpan(2) }) {
+            // 顶部焦点面板：渐变强调面板承载今日专注总时长（设计系统「强调面板」层级）
+            GradientPanel {
+                Text("今日专注", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
+                Spacer(Modifier.height(4.dp))
+                Row {
+                    Text("$focusMin", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.alignByBaseline())
+                    Text(" 分钟", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f), modifier = Modifier.alignByBaseline())
+                    Text(" · 目标 120", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.alignByBaseline())
                 }
             }
-            items(1, span = { GridItemSpan(2) }) { HubSectionHeader("今日状态", Icons.Filled.Insights) }
-            items(1) { FocusStatCard(metas[0], "${focusMin} 分", "今日专注时长", nav) }
-            items(1) { FocusStatCard(metas[1], fmtSleep(sleepMin), "昨晚睡眠", nav) }
-            items(1) { FocusStatCard(metas[2], "${diets.size} 餐", "今日已记录", nav) }
-            items(1) { FocusStatCard(metas[3], "$todayChecked/${habits.size}", "今日打卡", nav) }
-            items(1, span = { GridItemSpan(2) }) {
-                PrimaryButton("开始一次专注", onClick = { nav.navigate(Routes.FOCUS) }, icon = Icons.Filled.PlayArrow)
-            }
+        }
+        items(1, span = { GridItemSpan(2) }) { HubSectionHeader("今日状态", Icons.Filled.Insights) }
+        items(1) { FocusStatCard(metas[0], "${focusMin} 分", "今日专注时长", nav) }
+        items(1) { FocusStatCard(metas[1], fmtSleep(sleepMin), "昨晚睡眠", nav) }
+        items(1) { FocusStatCard(metas[2], "${diets.size} 餐", "今日已记录", nav) }
+        items(1) { FocusStatCard(metas[3], "$todayChecked/${habits.size}", "今日打卡", nav) }
+        items(1, span = { GridItemSpan(2) }) {
+            PrimaryButton("开始一次专注", onClick = { nav.navigate(Routes.FOCUS) }, icon = Icons.Filled.PlayArrow)
         }
     }
 }

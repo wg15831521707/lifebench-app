@@ -26,7 +26,6 @@ import com.lifebench.app.data.Repo
 import com.lifebench.app.data.entity.TodoEntity
 import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.AppCard
-import com.lifebench.app.ui.components.AppTopBar
 import com.lifebench.app.ui.components.ConfirmDeleteDialog
 import com.lifebench.app.ui.components.HeroCard
 import com.lifebench.app.ui.components.MetricLine
@@ -100,33 +99,21 @@ fun HomeScreen(nav: NavController) {
     val toolRows = remember { homeToolMetas.chunked(2) }
 
     LazyColumn(Modifier.fillMaxSize()) {
-        item {
-            AppTopBar(
-                title = "工作台",
-                actions = {
-                    IconButton(onClick = {
-                        val next = when (themeMode) {
-                            "SYSTEM" -> "LIGHT"; "LIGHT" -> "DARK"; else -> "SYSTEM"
-                        }
-                        scope.launch { Repo.settings.setThemeMode(next) }
-                    }) {
-                        Icon(
-                            if (themeMode == "DARK") Icons.Filled.LightMode else Icons.Filled.DarkMode,
-                            contentDescription = "主题切换"
-                        )
-                    }
-                }
-            )
-        }
-
-        item { Spacer(Modifier.height(Dimen.s12)) }
+        // 主题切换已移入 HeroCard 右上角（替换原头像徽章），无需独立顶栏
+        item { Spacer(Modifier.height(Dimen.s8)) }
         item {
             HeroCard(
                 greeting = greetText,
                 date = "$year 年 · $weekday · $dateStr",
-                avatarText = "浩",
                 focusMin = focusMin,
                 focusTarget = 120,
+                themeMode = themeMode,
+                onThemeToggle = {
+                    val next = when (themeMode) {
+                        "SYSTEM" -> "LIGHT"; "LIGHT" -> "DARK"; else -> "SYSTEM"
+                    }
+                    scope.launch { Repo.settings.setThemeMode(next) }
+                },
                 modifier = Modifier.padding(horizontal = Dimen.s16)
             )
         }
@@ -171,7 +158,7 @@ fun HomeScreen(nav: NavController) {
             }
             if (idx < toolRows.lastIndex) Spacer(Modifier.height(Dimen.s12))
         }
-        item { Spacer(Modifier.height(Dimen.s24)) }
+        item { Spacer(Modifier.height(Dimen.s8)) }
     }
 }
 

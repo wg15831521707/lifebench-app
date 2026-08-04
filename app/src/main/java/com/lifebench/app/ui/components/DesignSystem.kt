@@ -4,6 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,19 +44,21 @@ private fun brandBrush(): Brush {
 }
 
 /**
- * 首页 Hero 锚点（设计系统第一层级）：渐变面板承载问候 + 日期 + 头像 + 当日专注环形，
+ * 首页 Hero 锚点（设计系统第一层级）：渐变面板承载问候 + 日期 + 主题切换 + 当日专注环形，
  * 把页面视觉重心拉到最顶端。文字统一白色，靠渐变主色兜底对比；环形与主色面板形成「强调面板」权重。
  */
 @Composable
 fun HeroCard(
     greeting: String,
     date: String,
-    avatarText: String,
     focusMin: Int,
     focusTarget: Int,
+    themeMode: String = "SYSTEM",
+    onThemeToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val progress = if (focusTarget > 0) (focusMin.toFloat() / focusTarget).coerceIn(0f, 1f) else 0f
+    val isZero = focusMin == 0
     Box(
         modifier
             .fillMaxWidth()
@@ -66,13 +73,20 @@ fun HeroCard(
                     Spacer(Modifier.height(4.dp))
                     Text(date, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
                 }
+                // 主题切换按钮（替代原头像徽章，功能更实用）
                 Surface(
                     shape = CircleShape,
                     color = Color.White.copy(alpha = 0.22f),
-                    modifier = Modifier.size(42.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(avatarText, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    IconButton(
+                        onClick = onThemeToggle,
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Icon(
+                            if (themeMode == "DARK") Icons.Filled.LightMode else Icons.Filled.DarkMode,
+                            contentDescription = "主题切换",
+                            tint = Color.White
+                        )
                     }
                 }
             }
@@ -80,13 +94,14 @@ fun HeroCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RingProgress(
                     progress = progress,
-                    modifier = Modifier.size(62.dp),
+                    modifier = Modifier.size(if (isZero) 40.dp else 62.dp),
                     color = Color.White,
                     trackColor = Color.White.copy(alpha = 0.28f),
-                    strokeWidth = 8.dp
+                    strokeWidth = if (isZero) 5.dp else 8.dp
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("$focusMin", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text("$focusMin", color = Color.White, fontWeight = FontWeight.Bold,
+                            style = if (isZero) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium)
                     }
                 }
                 Spacer(Modifier.width(14.dp))
@@ -129,7 +144,7 @@ fun SectionHeader(
                 onClick = onMore,
                 contentPadding = PaddingValues(horizontal = Dimen.s4, vertical = Dimen.s2)
             ) {
-                Text(moreLabel, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(moreLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

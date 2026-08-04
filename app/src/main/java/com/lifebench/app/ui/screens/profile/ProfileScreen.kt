@@ -44,8 +44,6 @@ fun ProfileScreen(nav: NavController) {
     val longestStreak = habits.maxOfOrNull { streakOf(byHabit[it.id] ?: emptySet()) } ?: 0
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AppTopBar("个人中心")
-        Spacer(Modifier.height(Dimen.s12))
         // 个人头部：渐变头像 + 昵称 + 累计坚持天数（设计系统 ProfileHeader）
         ProfileHeader(name = "王浩", subtitle = "自律给我自由 · 已坚持 ${longestStreak} 天", avatarText = "浩")
         Spacer(Modifier.height(Dimen.s12))
