@@ -18,9 +18,12 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.12`（`versionCode 10512`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.13`（`versionCode 10513`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.13 (2026-08-04, patch) — 抖音跳转改为直接拉起官方 App
+- **修复**：抖音热榜视频墙点击卡片不再落到系统浏览器网页版。改用抖音私有 scheme `snssdk1128://`（如 `snssdk1128://search?keyword=…`），只要设备已安装抖音 App 就**必然直接拉起官方 App** 打开对应搜索；仅当 App 未安装时才回退网页版。`https + 指定包名` 作为二级兜底保留。
 
 ### v1.5.12 (2026-08-04, minor) — 新增「抖音热榜视频墙」
 - **新功能**：工具页 / 首页「全部工具」新增「抖音热榜」入口，进入为双列视频墙（封面 + 排名 + 热度 + 热/沸/爆标签）。点击任意卡片**优先拉起抖音 App**播放对应话题视频，未安装则回退系统浏览器打开抖音网页版。

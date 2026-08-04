@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import java.net.URLDecoder
+import java.net.URLEncoder
 import com.google.gson.Gson
 import com.lifebench.app.ui.components.AppTopBar
 import com.lifebench.app.ui.theme.Dimen
@@ -39,8 +41,8 @@ import java.nio.charset.Charset
 /**
  * 抖音热榜视频墙（占位内容，后续可替换为用户自选视频）。
  * - 离线快照来自 assets/douyin/hotlist.json + 本地压缩封面，无需联网；
- * - 点击任意卡片 -> 尝试用抖音 App（com.ss.android.ugc.aweme）打开对应话题，
- *   未安装则回退系统浏览器打开抖音网页版。
+ * - 点击任意卡片 -> 直接拉起抖音官方 App（com.ss.android.ugc.aweme）打开对应搜索，
+ *   优先使用抖音私有 scheme（snssdk1128）确保一定打开 App；仅在 App 未安装时才回退网页版。
  */
 
 private data class DouyinHotItem(
@@ -53,17 +55,49 @@ private data class DouyinHotItem(
     val link: String,
 )
 
-/** 跳转抖音：优先拉起 App，失败回退浏览器。 */
+/** 跳转抖音：优先用私有 scheme 直接拉起官方 App，未安装才回退浏览器。 */
 fun openDouyin(context: Context, url: String) {
-    val toApp = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+    // 1) 抖音私有 scheme 一定命中 App（已安装时），体验最佳、不会落到网页
+    buildDouyinSchemeIntent(url)?.let { schemeIntent ->
+        if (schemeIntent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(schemeIntent)
+            return
+        }
+    }
+    // 2) 兜底：指定抖音包名尝试 https 深链
+    val appIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
         setPackage("com.ss.android.ugc.aweme")
     }
     try {
-        context.startActivity(toApp)
+        context.startActivity(appIntent)
     } catch (_: ActivityNotFoundException) {
+        // 仅在抖音 App 未安装时，才退回网页版
         context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
     }
 }
+
+/**
+ * 将抖音网页链接转换为 App 私有 scheme 意图：
+ * - www.douyin.com/search/关键词 -> snssdk1128://search?keyword=关键词
+ * - 其它抖音链接（视频/用户等）直接把 https 换成 snssdk1128://
+ * 私有 scheme 在抖音已安装时必然命中 App，避免被系统浏览器拦截。
+ */
+private fun buildDouyinSchemeIntent(url: String): Intent? = runCatching {
+    val uri = android.net.Uri.parse(url)
+    val host = uri.host.orEmpty()
+    if (!host.contains("douyin.com")) return@runCatching null
+    val deep = if (uri.path?.startsWith("/search") == true) {
+        val keyword = uri.lastPathSegment ?: return@runCatching null
+        val decoded = java.net.URLDecoder.decode(keyword, "UTF-8")
+        "snssdk1128://search?keyword=${java.net.URLEncoder.encode(decoded, "UTF-8")}"
+    } else {
+        url.replaceFirst(Regex("^https?://"), "snssdk1128://")
+    }
+    Intent(Intent.ACTION_VIEW, android.net.Uri.parse(deep)).apply {
+        setPackage("com.ss.android.ugc.aweme")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+}.getOrNull()
 
 @Composable
 fun DouyinWallScreen(nav: NavController) {
