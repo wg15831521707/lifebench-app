@@ -55,49 +55,76 @@ private data class DouyinHotItem(
     val link: String,
 )
 
-/** 跳转抖音：优先用私有 scheme 直接拉起官方 App，未安装才回退浏览器。 */
+/**
+ * 跳转抖音：只要设备装了抖音官方 App，就一定会拉起 App（绝不会落到网页）。
+ * 机型适配重点（华为 Nova 6 / HarmonyOS 4.2 / 抖音 39.9.0 等 Android 11+ 机型）：
+ * 1) 必须在 AndroidManifest 用 <queries> 声明 com.ss.android.ugc.aweme，
+ *    否则系统认为抖音「不可见/未安装」，resolveActivity 一律返回 null；
+ * 2) 依次尝试：App Link(https+包名) -> 私有 scheme(snssdk1128) -> 直接拉起 App 首页；
+ * 3) 仅当抖音确实未安装时，才回退到浏览器打开网页版。
+ */
 fun openDouyin(context: Context, url: String) {
-    // 1) 抖音私有 scheme 一定命中 App（已安装时），体验最佳、不会落到网页
-    buildDouyinSchemeIntent(url)?.let { schemeIntent ->
-        if (schemeIntent.resolveActivity(context.packageManager) != null) {
-            context.startActivity(schemeIntent)
+    val pm = context.packageManager
+    val pkg = "com.ss.android.ugc.aweme"
+    val installed = runCatching { pm.getPackageInfo(pkg, 0) != null }.getOrElse { false }
+
+    if (installed) {
+        // 依次尝试所有候选意图，第一个能 resolve 的就启动（优先内容深链，最后兜底 App 首页）
+        for (intent in buildDouyinIntents(url, pkg)) {
+            if (intent.resolveActivity(pm) != null) {
+                context.startActivity(intent)
+                return
+            }
+        }
+        // 极少数情况下所有 scheme 都 resolve 不到，但 App 确实在 -> 直接拉起首页
+        pm.getLaunchIntentForPackage(pkg)?.let {
+            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(it)
             return
         }
     }
-    // 2) 兜底：指定抖音包名尝试 https 深链
-    val appIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
-        setPackage("com.ss.android.ugc.aweme")
-    }
-    try {
-        context.startActivity(appIntent)
-    } catch (_: ActivityNotFoundException) {
-        // 仅在抖音 App 未安装时，才退回网页版
-        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-    }
+    // 仅当抖音未安装时才退到浏览器
+    context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
 }
 
 /**
- * 将抖音网页链接转换为 App 私有 scheme 意图：
- * - www.douyin.com/search/关键词 -> snssdk1128://search?keyword=关键词
- * - 其它抖音链接（视频/用户等）直接把 https 换成 snssdk1128://
- * 私有 scheme 在抖音已安装时必然命中 App，避免被系统浏览器拦截。
+ * 构造一组「打开抖音」候选意图，按优先级排序：
+ * 1) App Link：https + 包名（若抖音为该域名注册了已校验 App Link，可直接在 App 内打开搜索/视频）
+ * 2) 私有 scheme：snssdk1128://search?keyword=关键词（搜索场景）
+ * 3) 私有 scheme：snssdk1128:// + 原路径（视频/用户等）
+ * 4) 私有 scheme：裸 snssdk1128://（一定拉起 App 首页）
  */
-private fun buildDouyinSchemeIntent(url: String): Intent? = runCatching {
-    val uri = android.net.Uri.parse(url)
+private fun buildDouyinIntents(url: String, pkg: String): List<Intent> {
+    val uri = runCatching { android.net.Uri.parse(url) }.getOrNull() ?: return emptyList()
     val host = uri.host.orEmpty()
-    if (!host.contains("douyin.com")) return@runCatching null
-    val deep = if (uri.path?.startsWith("/search") == true) {
-        val keyword = uri.lastPathSegment ?: return@runCatching null
-        val decoded = java.net.URLDecoder.decode(keyword, "UTF-8")
-        "snssdk1128://search?keyword=${java.net.URLEncoder.encode(decoded, "UTF-8")}"
-    } else {
-        url.replaceFirst(Regex("^https?://"), "snssdk1128://")
+    if (!host.contains("douyin.com")) return emptyList()
+    val flag = Intent.FLAG_ACTIVITY_NEW_TASK
+    val list = mutableListOf<Intent>()
+
+    // 1) App Link（带包名，避免被系统浏览器抢走）
+    list += Intent(Intent.ACTION_VIEW, uri).apply { setPackage(pkg); addFlags(flag) }
+
+    val keyword = if (uri.path?.startsWith("/search") == true) {
+        uri.lastPathSegment?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+    } else null
+
+    // 2) 搜索专用 scheme
+    if (keyword != null) {
+        val enc = java.net.URLEncoder.encode(keyword, "UTF-8")
+        list += Intent(Intent.ACTION_VIEW, android.net.Uri.parse("snssdk1128://search?keyword=$enc")).apply {
+            setPackage(pkg); addFlags(flag)
+        }
     }
-    Intent(Intent.ACTION_VIEW, android.net.Uri.parse(deep)).apply {
-        setPackage("com.ss.android.ugc.aweme")
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    // 3) 通用 scheme（视频/用户链接把 https 换成 snssdk1128）
+    list += Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url.replaceFirst(Regex("^https?://"), "snssdk1128://"))).apply {
+        setPackage(pkg); addFlags(flag)
     }
-}.getOrNull()
+    // 4) 裸 scheme：兜底一定拉起 App
+    list += Intent(Intent.ACTION_VIEW, android.net.Uri.parse("snssdk1128://")).apply {
+        setPackage(pkg); addFlags(flag)
+    }
+    return list
+}
 
 @Composable
 fun DouyinWallScreen(nav: NavController) {

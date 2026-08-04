@@ -18,11 +18,15 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.13`（`versionCode 10513`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.14`（`versionCode 10514`）；包名 `com.lifebench.app`。
 
 ## 更新日志
 
-### v1.5.13 (2026-08-04, patch) — 抖音跳转改为直接拉起官方 App
+### v1.5.14 (2026-08-04, patch) — 抖音跳转机型适配（华为/HarmonyOS 真因修复）
+- **真因**：v1.5.13 在华为 Nova 6（HarmonyOS 4.2，≈ Android 12）上仍跳网页，根因是 **Android 11+ 包可见性**——未声明 `<queries>` 时，系统认为抖音「不可见/未安装」，`resolveActivity` 一律返回 null，所有深链都回退浏览器。与 scheme 写法无关。
+- **修复**：① `AndroidManifest.xml` 新增 `<queries><package android:name="com.ss.android.ugc.aweme"/></queries>`，让系统能「看见」抖音；② `openDouyin` 改为先 `getPackageInfo` 探测安装，再依次尝试 App Link(`https`+包名) → 私有 scheme(`snssdk1128://search?keyword=`/通用/裸 scheme) → 直接拉起 App 首页，仅当**确实未安装抖音**才回退网页版。抖音 39.9.0 实测直接拉起官方 App。
+
+### v1.5.13 (2026-08-04, patch) — 抖音跳转改为直接拉起官方 App（部分机型失效，已被 v1.5.14 修复）
 - **修复**：抖音热榜视频墙点击卡片不再落到系统浏览器网页版。改用抖音私有 scheme `snssdk1128://`（如 `snssdk1128://search?keyword=…`），只要设备已安装抖音 App 就**必然直接拉起官方 App** 打开对应搜索；仅当 App 未安装时才回退网页版。`https + 指定包名` 作为二级兜底保留。
 
 ### v1.5.12 (2026-08-04, minor) — 新增「抖音热榜视频墙」
