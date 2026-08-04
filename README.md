@@ -18,9 +18,16 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.15`（`versionCode 10515`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.16`（`versionCode 10516`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.16 (2026-08-04, patch) — 抖音跳转修复：已装抖音必开 App，不再落网页
+
+- **问题**：v1.5.14 / v1.5.15 在华为 Nova 6（HarmonyOS 4.2 / 抖音 39.9.0）上仍跳到网页。
+- **根因**：抖音 39.9.0 未为 `https://www.douyin.com/search/...` 注册 App Link，导致 `queryIntentActivities` 对该 URL 只返回系统浏览器；v1.5.15 的 `openDouyin` 在「首选候选为空」时直接 `startActivity(https intent)` 并 `return`，绕过了后面的 `getLaunchIntentForPackage` 兜底，于是打开了网页。
+- **修复**：① 删除「交由系统默认」的早退分支；② 内容深链改为多候选尝试——**域名优先 → `snssdk1128://search?keyword=` → 通用 scheme**，包名取「已知包 + 动态识别的抖音类包」；③ 所有深链都不命中时，**先 `getLaunchIntentForPackage` 拉起 App 首页，仅在抖音确实未装才回退浏览器**。保证已装抖音必开 App。
+- **抗更新**：`snssdk1128` 仅作「增强候选」之一，且即便它未来失效，App 仍可由域名 + `getLaunchIntentForPackage` 兜底打开，不存在单点故障。
 
 ### v1.5.15 (2026-08-04, patch) — 抖音跳转「去硬编码」：主路径按域名解析，抗抖音更新
 
