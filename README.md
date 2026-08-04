@@ -18,9 +18,13 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.11`（`versionCode 10511`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.12`（`versionCode 10512`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.12 (2026-08-04, minor) — 新增「抖音热榜视频墙」
+- **新功能**：工具页 / 首页「全部工具」新增「抖音热榜」入口，进入为双列视频墙（封面 + 排名 + 热度 + 热/沸/爆标签）。点击任意卡片**优先拉起抖音 App**播放对应话题视频，未安装则回退系统浏览器打开抖音网页版。
+- **离线优先**：热榜为本地快照（实时抓取 30 条热点 + 压缩封面），随应用打包于 `assets/douyin/`，无需联网（应用本就不申请 INTERNET 权限）；封面加载失败自动降级为品牌渐变占位。
 
 ### v1.5.11 (2026-08-03, patch) — 桌面图标改为方形 legacy PNG
 - **修复/优化**：桌面/启动器图标由自适应图标（`mipmap-anydpi-v26` 珐琅自适应层）切换为**传统方形 PNG 图标**（各密度 `mipmap-mdpi`…`xxxhdpi` 的 `ic_launcher.png`）。原因：自适应图标的形状（圆角/圆/方）由设备 launcher/ROM 遮罩决定、App 端无法覆盖；MIUI/HyperOS、EMUI 等国产 ROM 对 legacy 图标不做遮罩、按原始方形渲染，故改用方形 PNG 可在这些 ROM 上更接近方图。自适应层已重命名为 `.bak` 可一键还原。关于页（`ProfileScreen`）仍用 `ic_launcher_art` 圆形展示，不受影响。

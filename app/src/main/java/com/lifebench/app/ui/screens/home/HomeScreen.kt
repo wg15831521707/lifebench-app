@@ -552,6 +552,7 @@ private val homeToolMetas = listOf(
     ToolMeta("笔记", "灵感随时记录", Icons.Filled.Note, Routes.NOTE, 0),
     ToolMeta("密码箱", "加密保管账号密码", Icons.Filled.Lock, Routes.PASSWORD, 3),
     ToolMeta("纪念日", "重要日子不错过", Icons.Filled.Celebration, Routes.ANNIVERSARY, 1),
+    ToolMeta("抖音热榜", "热门视频一键直达", Icons.Filled.SmartDisplay, Routes.DOUYIN_WALL, 1),
 )
 
 // 小工具：睡眠时长展示
