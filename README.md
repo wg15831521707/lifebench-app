@@ -18,9 +18,15 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.14`（`versionCode 10514`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.15`（`versionCode 10515`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.15 (2026-08-04, patch) — 抖音跳转「去硬编码」：主路径按域名解析，抗抖音更新
+
+- **背景**：用户指出抖音私有 scheme（`snssdk1128://`）与包名不应写死，避免抖音 App 更新后跳转失效。
+- **根因认知**：① 包名 `com.ss.android.ugc.aweme` 是 App 身份标识，常规更新不会变（安全）；② 私有 scheme 才是真风险——历史上有改动，写死作为主路径会在新版失效。
+- **修复**：① `openDouyin` 主路径改为**按 `douyin.com` 域名交给系统解析**（`queryIntentActivities` + `ACTION_VIEW`），不依赖任何写死包名 / scheme；② 包名仅作「偏好与兜底」（优先选抖音候选包、未命中则交给系统默认、仍未命中用 `getLaunchIntentForPackage` 拉起首页）；③ **彻底移除 `snssdk1128` 私有 scheme**；④ `AndroidManifest` 的 `<queries>` 由「声明包名」升级为「按 host 声明 `www.douyin.com` / `v.douyin.com`」，即使抖音未来换包名、只要仍注册 douyin.com App Link 即可拉起。仅当抖音完全未安装才回退浏览器。
 
 ### v1.5.14 (2026-08-04, patch) — 抖音跳转机型适配（华为/HarmonyOS 真因修复）
 - **真因**：v1.5.13 在华为 Nova 6（HarmonyOS 4.2，≈ Android 12）上仍跳网页，根因是 **Android 11+ 包可见性**——未声明 `<queries>` 时，系统认为抖音「不可见/未安装」，`resolveActivity` 一律返回 null，所有深链都回退浏览器。与 scheme 写法无关。

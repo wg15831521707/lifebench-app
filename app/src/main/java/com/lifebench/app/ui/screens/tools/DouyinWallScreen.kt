@@ -29,8 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import java.net.URLDecoder
-import java.net.URLEncoder
 import com.google.gson.Gson
 import com.lifebench.app.ui.components.AppTopBar
 import com.lifebench.app.ui.theme.Dimen
@@ -41,8 +39,9 @@ import java.nio.charset.Charset
 /**
  * 抖音热榜视频墙（占位内容，后续可替换为用户自选视频）。
  * - 离线快照来自 assets/douyin/hotlist.json + 本地压缩封面，无需联网；
- * - 点击任意卡片 -> 直接拉起抖音官方 App（com.ss.android.ugc.aweme）打开对应搜索，
- *   优先使用抖音私有 scheme（snssdk1128）确保一定打开 App；仅在 App 未安装时才回退网页版。
+ * - 点击任意卡片 -> 直接拉起抖音官方 App 打开对应搜索；
+ *   主路径按 douyin.com 域名交给系统解析（不写死包名 / 私有 scheme），
+ *   抖音 App 更新换包名或换 scheme 都不会“打不开”；仅当抖音未安装才回退网页版。
  */
 
 private data class DouyinHotItem(
@@ -56,74 +55,64 @@ private data class DouyinHotItem(
 )
 
 /**
- * 跳转抖音：只要设备装了抖音官方 App，就一定会拉起 App（绝不会落到网页）。
- * 机型适配重点（华为 Nova 6 / HarmonyOS 4.2 / 抖音 39.9.0 等 Android 11+ 机型）：
- * 1) 必须在 AndroidManifest 用 <queries> 声明 com.ss.android.ugc.aweme，
- *    否则系统认为抖音「不可见/未安装」，resolveActivity 一律返回 null；
- * 2) 依次尝试：App Link(https+包名) -> 私有 scheme(snssdk1128) -> 直接拉起 App 首页；
- * 3) 仅当抖音确实未安装时，才回退到浏览器打开网页版。
+ * 跳转抖音：只要设备装了抖音，就一定会拉起 App，且【不依赖任何写死的私有 scheme】。
+ *
+ * 设计原则（避免“抖音更新后跳转失效”）：
+ * 1) 主路径：用 https://www.douyin.com/... 这个【域名】交给系统解析
+ *    （AndroidManifest <queries> 已按 host 声明 douyin.com）。域名是抖音自有的稳定资产，
+ *    抖音 App 更新不会改变它注册的 App Link，因此主路径不受版本影响。
+ * 2) 包名 / scheme 仅作【偏好与兜底】，而非唯一入口：
+ *    - 优先从“能处理该域名的应用”里选抖音候选包名，避免弹出选择器；
+ *    - 若没解析到具体 App 但抖音确实已安装，用 getLaunchIntentForPackage 拉起首页；
+ *    - 仅当抖音完全未安装，才回退浏览器。
+ * 这样即便抖音将来更换包名或私有 scheme，只要还注册 douyin.com 域名，“打开 App”就不会失效。
  */
+
+/** 抖音候选包名（仅作偏好提示，不是硬性依赖；主路径靠域名解析，不靠它）。 */
+private val DOUYIN_PACKAGES = listOf(
+    "com.ss.android.ugc.aweme",
+    "com.ss.android.ugc.aweme.lite",
+)
+
 fun openDouyin(context: Context, url: String) {
     val pm = context.packageManager
-    val pkg = "com.ss.android.ugc.aweme"
-    val installed = runCatching { pm.getPackageInfo(pkg, 0) != null }.getOrElse { false }
-
-    if (installed) {
-        // 依次尝试所有候选意图，第一个能 resolve 的就启动（优先内容深链，最后兜底 App 首页）
-        for (intent in buildDouyinIntents(url, pkg)) {
-            if (intent.resolveActivity(pm) != null) {
-                context.startActivity(intent)
-                return
-            }
-        }
-        // 极少数情况下所有 scheme 都 resolve 不到，但 App 确实在 -> 直接拉起首页
-        pm.getLaunchIntentForPackage(pkg)?.let {
-            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(it)
-            return
-        }
+    val uri = runCatching { android.net.Uri.parse(url) }.getOrNull()
+    if (uri == null || !uri.host.orEmpty().contains("douyin.com")) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        return
     }
-    // 仅当抖音未安装时才退到浏览器
-    context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-}
 
-/**
- * 构造一组「打开抖音」候选意图，按优先级排序：
- * 1) App Link：https + 包名（若抖音为该域名注册了已校验 App Link，可直接在 App 内打开搜索/视频）
- * 2) 私有 scheme：snssdk1128://search?keyword=关键词（搜索场景）
- * 3) 私有 scheme：snssdk1128:// + 原路径（视频/用户等）
- * 4) 私有 scheme：裸 snssdk1128://（一定拉起 App 首页）
- */
-private fun buildDouyinIntents(url: String, pkg: String): List<Intent> {
-    val uri = runCatching { android.net.Uri.parse(url) }.getOrNull() ?: return emptyList()
-    val host = uri.host.orEmpty()
-    if (!host.contains("douyin.com")) return emptyList()
-    val flag = Intent.FLAG_ACTIVITY_NEW_TASK
-    val list = mutableListOf<Intent>()
+    // 主路径：系统按域名解析（不写死包名 / scheme）
+    val base = Intent(Intent.ACTION_VIEW, uri)
+    val candidates = pm.queryIntentActivities(base, 0)
+        .map { it.activityInfo.packageName }
+        .distinct()
 
-    // 1) App Link（带包名，避免被系统浏览器抢走）
-    list += Intent(Intent.ACTION_VIEW, uri).apply { setPackage(pkg); addFlags(flag) }
-
-    val keyword = if (uri.path?.startsWith("/search") == true) {
-        uri.lastPathSegment?.let { java.net.URLDecoder.decode(it, "UTF-8") }
-    } else null
-
-    // 2) 搜索专用 scheme
-    if (keyword != null) {
-        val enc = java.net.URLEncoder.encode(keyword, "UTF-8")
-        list += Intent(Intent.ACTION_VIEW, android.net.Uri.parse("snssdk1128://search?keyword=$enc")).apply {
-            setPackage(pkg); addFlags(flag)
+    // 优先抖音候选包名；若未命中已知包（如抖音换了包名）则交给系统默认处理（通常为抖音本身）
+    val preferred = candidates.firstOrNull { it in DOUYIN_PACKAGES }
+    if (preferred != null) {
+        val intent = Intent(base).apply { setPackage(preferred) }
+        if (intent.resolveActivity(pm) != null) {
+            runCatching { context.startActivity(intent) }.onSuccess { return }
+        }
+    } else if (candidates.isNotEmpty()) {
+        // 能处理该域名的不是已知包（可能是抖音新包名或浏览器）；直接交给系统解析
+        if (base.resolveActivity(pm) != null) {
+            runCatching { context.startActivity(base) }.onSuccess { return }
         }
     }
-    // 3) 通用 scheme（视频/用户链接把 https 换成 snssdk1128）
-    list += Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url.replaceFirst(Regex("^https?://"), "snssdk1128://"))).apply {
-        setPackage(pkg); addFlags(flag)
+
+    // 兜底：抖音确实已安装但上述未命中 -> 直接拉起 App 首页
+    for (pkg in DOUYIN_PACKAGES) {
+        val home = runCatching { pm.getLaunchIntentForPackage(pkg) }.getOrNull()
+        if (home != null) {
+            home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { context.startActivity(home) }.onSuccess { return }
+        }
     }
-    // 4) 裸 scheme：兜底一定拉起 App
-    list += Intent(Intent.ACTION_VIEW, android.net.Uri.parse("snssdk1128://")).apply {
-        setPackage(pkg); addFlags(flag)
-    }
-    return list
+
+    // 终兜底：无抖音 -> 浏览器打开网页版
+    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
 }
 
 @Composable

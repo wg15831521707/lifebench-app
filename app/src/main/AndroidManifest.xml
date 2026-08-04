@@ -13,7 +13,18 @@
     <!-- Android 11+ 包可见性：声明抖音，否则 resolveActivity / getLaunchIntentForPackage
          会以为抖音未安装，导致点击热榜被回退到浏览器（华为/HarmonyOS 机型尤其明显）。 -->
     <queries>
+        <!-- 抖音主端包名：保证 getLaunchIntentForPackage / getPackageInfo 可见（兜底拉起首页用） -->
         <package android:name="com.ss.android.ugc.aweme" />
+        <!-- 按【域名】而非写死包名声明可见性：只要抖音仍注册 douyin.com 的 App Link，
+             即使将来更换包名，点击依旧能由系统解析并拉起抖音 App -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="www.douyin.com" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="v.douyin.com" />
+        </intent>
     </queries>
 
     <application
