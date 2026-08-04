@@ -18,11 +18,14 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.16`（`versionCode 10516`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.17`（`versionCode 10517`）；包名 `com.lifebench.app`。
 
 ## 更新日志
 
-### v1.5.16 (2026-08-04, patch) — 抖音跳转修复：已装抖音必开 App，不再落网页
+### v1.5.17 (2026-08-04, patch) — 抖音跳转兜底加固：浏览器解析一律跳过 + 点击 Toast 诊断
+
+- **加固**：① 解析结果若落在浏览器包（华为浏览器/Chrome 等）**一律跳过，绝不打开**；② 已装抖音但深链未命中时，强制 `getLaunchIntentForPackage` 拉起 App 首页；③ 点击后用 Toast 告知实际结果（「已为你打开抖音」/「未检测到抖音，已打开网页版」），便于用户与我快速定位。
+- **抗更新**：主路径仍按 `douyin.com` 域名解析，包名/私有 scheme 仅作增强候选，无单点故障。
 
 - **问题**：v1.5.14 / v1.5.15 在华为 Nova 6（HarmonyOS 4.2 / 抖音 39.9.0）上仍跳到网页。
 - **根因**：抖音 39.9.0 未为 `https://www.douyin.com/search/...` 注册 App Link，导致 `queryIntentActivities` 对该 URL 只返回系统浏览器；v1.5.15 的 `openDouyin` 在「首选候选为空」时直接 `startActivity(https intent)` 并 `return`，绕过了后面的 `getLaunchIntentForPackage` 兜底，于是打开了网页。

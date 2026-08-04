@@ -3,6 +3,7 @@ package com.lifebench.app.ui.screens.tools
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -57,16 +58,15 @@ private data class DouyinHotItem(
 )
 
 /**
- * 跳转抖音：只要设备装了抖音，就一定会拉起 App，绝不会落到网页。
+ * 跳转抖音：只要设备装了抖音，就一定会拉起 App，绝不会落到浏览器。
  *
  * 设计原则（既保证“抖音更新后仍能跳”，又保证“当前一定能跳”）：
- * 1) 内容深链多候选：① https://...（域名，抗更新，优先）② snssdk1128://search?keyword=...
- *    （抖音长期稳定的私有 scheme，仅作增强）③ 通用 snssdk1128:// 兜底。
- *    —— 任一能 resolve 即拉起 App 并打开对应内容；没有单点故障。
+ * 1) 内容深链多候选：① snssdk1128://search?keyword=...（抖音长期稳定的私有 scheme，仅作增强）
+ *    ② 通用 snssdk1128:// ③ https://...（域名，抗更新）。任一能 resolve 且解析到的不是浏览器即拉起 App。
  * 2) 包名来自「已知包 + 动态识别的抖音类包」，抗抖音换包名。
- * 3) 关键修复：内容深链都不命中时，先 getLaunchIntentForPackage 拉起 App 首页，
- *    【绝不在“已装抖音”的情况下回退浏览器】；仅当抖音真的没装才回退网页。
- *    （此前 v1.5.15 在“能处理该域名的只有浏览器”时会直接打开网页并 return，已在本次修复。）
+ * 3) 关键修复（v1.5.17）：解析结果若落在【浏览器包】一律跳过；已装抖音但深链未命中时，
+ *    用 getLaunchIntentForPackage 强制拉起 App 首页，【绝不在“已装抖音”情况下回退浏览器】。
+ * 4) 仅当抖音真的没装才回退网页，并用 Toast 明确告知用户实际发生了什么（便于排查）。
  */
 
 /** 抖音候选包名（偏好提示 + 兜底；并非唯一入口，主路径靠域名 / 系统解析）。 */
@@ -79,56 +79,79 @@ private val DOUYIN_PACKAGES = listOf(
 private fun isDouyinPkg(p: String): Boolean =
     p.contains("douyin", true) || p.contains("aweme", true) || p.contains("bytedance", true)
 
+/** 浏览器包关键词：解析结果命中这些一律视为“会跳网页”，必须跳过。 */
+private val BROWSER_KEYWORDS = listOf(
+    "browser", "chrome", "huawei.browser", "browserhd", "miui.browser",
+    "sogou", "uc", "qqbrowser", "opera", "firefox", "360browser", "hao", "explorer",
+)
+
+private fun isBrowserPkg(pkg: String?): Boolean {
+    if (pkg == null) return false
+    val lp = pkg.lowercase()
+    return BROWSER_KEYWORDS.any { lp.contains(it) }
+}
+
 fun openDouyin(context: Context, url: String) {
     val pm = context.packageManager
     val uri = runCatching { android.net.Uri.parse(url) }.getOrNull()
     if (uri == null || !uri.host.orEmpty().contains("douyin.com")) {
-        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        safeStart(context, Intent(Intent.ACTION_VIEW, uri), "未识别到抖音链接，已打开网页")
         return
     }
 
-    // 1) 探测抖音是否已安装（<queries> 已声明包名，可见）；再从域名处理者里动态识别抖音类包
-    val installedPkg = DOUYIN_PACKAGES.firstOrNull { pkg ->
-        runCatching { pm.getPackageInfo(pkg, 0) != null }.getOrDefault(false)
-    }
-    val domainPkg = pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, uri), 0)
+    // 候选包：已知抖音包 + 从域名处理者中动态识别（抗换包名）
+    val domainPkgs = pm.queryIntentActivities(Intent(Intent.ACTION_VIEW, uri), 0)
         .map { it.activityInfo.packageName }.distinct()
-        .firstOrNull { isDouyinPkg(it) }
-    val targetPkg = installedPkg ?: domainPkg
+        .filter { isDouyinPkg(it) }
+    val pkgs = (DOUYIN_PACKAGES + domainPkgs).distinct()
 
-    // 2) 内容深链候选：域名优先，其次 snssdk1128 搜索/通用
-    val contentIntents = buildList<Intent> {
-        add(Intent(Intent.ACTION_VIEW, uri))
+    // 内容深链候选（按优先级：私有 scheme 优先，域名兜底）
+    val candidates = buildList<Intent> {
         val keyword = if (uri.path?.startsWith("/search") == true)
             uri.lastPathSegment?.let { java.net.URLDecoder.decode(it, "UTF-8") } else null
-        if (keyword != null) {
-            val enc = java.net.URLEncoder.encode(keyword, "UTF-8")
-            add(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("snssdk1128://search?keyword=$enc")))
-        }
+        if (keyword != null)
+            add(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("snssdk1128://search?keyword=${java.net.URLEncoder.encode(keyword, "UTF-8")}")))
         add(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url.replaceFirst(Regex("^https?://"), "snssdk1128://"))))
+        add(Intent(Intent.ACTION_VIEW, uri)) // 域名，仅当解析到抖音自身时才用
     }
 
-    val pkgs = (listOfNotNull(targetPkg) + DOUYIN_PACKAGES).distinct()
+    // 1) 内容深链：任一候选 + 任一抖音包能 resolve，且解析到的【不是浏览器】-> 直接拉起 App 并打开内容
     for (pkg in pkgs) {
-        for (intent in contentIntents) {
-            val i = Intent(intent).apply { setPackage(pkg); addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-            if (i.resolveActivity(pm) != null) {
-                runCatching { context.startActivity(i) }.onSuccess { return }
+        for (cand in candidates) {
+            val i = Intent(cand).apply { setPackage(pkg); addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+            val resolved = runCatching { i.resolveActivity(pm) }.getOrNull()
+            if (resolved != null && !isBrowserPkg(resolved.packageName)) {
+                runCatching { context.startActivity(i) }.onSuccess {
+                    Toast.makeText(context, "已为你打开抖音", Toast.LENGTH_SHORT).show()
+                    return
+                }
             }
         }
     }
 
-    // 3) 兜底：抖音已安装但深链未命中 -> 直接拉起 App 首页（保证打开的是 App，绝不落网页）
+    // 2) 已装抖音但深链未命中 -> 直接拉起 App 首页（绝不落浏览器）
     for (pkg in pkgs) {
         val home = runCatching { pm.getLaunchIntentForPackage(pkg) }.getOrNull()
         if (home != null) {
             home.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { context.startActivity(home) }.onSuccess { return }
+            runCatching { context.startActivity(home) }.onSuccess {
+                Toast.makeText(context, "已为你打开抖音", Toast.LENGTH_SHORT).show()
+                return
+            }
         }
     }
 
-    // 4) 终兜底：设备确实没装抖音 -> 浏览器打开网页版
-    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    // 3) 终兜底：设备确实没装抖音 -> 浏览器打开网页版
+    safeStart(context, Intent(Intent.ACTION_VIEW, uri), "未检测到抖音 App，已打开网页版")
+}
+
+/** 安全启动并打印 Toast，避免静默失败。 */
+private fun safeStart(context: Context, intent: Intent, toast: String) {
+    runCatching { context.startActivity(intent) }.onSuccess {
+        Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
+    }.onFailure {
+        Toast.makeText(context, "无法打开，请手动打开抖音", Toast.LENGTH_SHORT).show()
+    }
 }
 
 @Composable
