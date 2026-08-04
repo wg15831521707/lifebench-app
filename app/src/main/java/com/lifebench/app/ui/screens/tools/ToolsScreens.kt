@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
@@ -46,6 +47,9 @@ import com.lifebench.app.navigation.Routes
 import com.lifebench.app.ui.components.GradientPanel
 import com.lifebench.app.ui.components.*
 import com.lifebench.app.ui.theme.Dimen
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.lifebench.app.R
 import com.lifebench.app.ui.theme.LocalExtraColors
 import com.lifebench.app.ui.theme.LocalQuadrantColors
 import com.lifebench.app.ui.theme.ThemePresets
@@ -580,6 +584,9 @@ fun SettingsScreen(nav: NavController) {
     val sound by Repo.settings.soundEnabled.collectAsStateWithLifecycle(true)
     val budget by Repo.settings.monthlyBudget.collectAsStateWithLifecycle(2000.0)
     val lock by Repo.settings.appLockEnabled.collectAsStateWithLifecycle(false)
+    val versionName = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "1.0"
+    }
 
     // 备份导出/导入：用系统文件选择器（SAF）自定义位置，不再藏在本机私有目录
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -669,6 +676,29 @@ fun SettingsScreen(nav: NavController) {
             PrimaryButton("打开系统权限设置", onClick = {
                 context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
             }, icon = Icons.Filled.OpenInNew)
+        }
+        Spacer(Modifier.height(Dimen.s12))
+        // 关于：从「我的」页迁移而来的完整描述
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(R.drawable.ic_launcher_art),
+                    contentDescription = "小满应用图标",
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), CircleShape)
+                )
+                Spacer(Modifier.width(Dimen.s12))
+                Column {
+                    Text("关于 小满", style = MaterialTheme.typography.titleMedium)
+                    Text("小满 v$versionName", fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Spacer(Modifier.height(Dimen.s8))
+            Text("离线优先 · 无广告 · 数据本地加密存储", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("四大主导航：工作台总览 / 专注空间（番茄钟·睡眠·饮食·习惯）/ 工具箱（待办·记账·密码箱·笔记·纪念日·舒尔特）/ 个人中心。全部数据仅存于本机。",
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Dimen.s24))
     }

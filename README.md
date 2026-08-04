@@ -18,9 +18,18 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.18`（`versionCode 10518`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.19`（`versionCode 10519`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.19 (2026-08-04, patch) — 「我的」页收敛：备份与关于迁出，去冗余
+
+- **我的页去冗余（两笔累积改动合并发版）**：
+  - 删除「我的」页「快捷设置」卡中重复的「导出全部备份」行（与下方备份卡重复）。
+  - 将「数据备份与恢复」整卡从「我的」页**完全移走**，只在「设置页」保留，消除功能入口冗余。
+  - 「关于」在「我的」页精简为一句宣传语（图标 + 应用名 +「离线优先 · 无广告 · 数据本地加密存储」），整卡可点击跳转「设置页」；详细描述（四大导航说明等）迁到「设置页 - 关于」卡下。
+  - 「设置页 - 关于」版本号改为**动态读取**（`packageManager.getPackageInfo().versionName`），不再写死过时的 `v1.5.10`。
+- **代码清理**：移除因备份卡迁出而变为死代码的导出/导入逻辑与相关导入（BackupUtil / Toast / ActivityResult / LocalContext / 协程 launch 等），仅 `streakOf()` 仍用的 `TimeUtil` 保留。
 
 ### v1.5.18 (2026-08-04, patch) — 抖音跳转根治「夸克里抖音网页」
 
