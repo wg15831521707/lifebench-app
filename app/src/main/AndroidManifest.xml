@@ -2,7 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 通知：提醒；精确闹钟：待办/闹钟/纪念日（本应用纯离线，不申请任何网络权限） -->
+    <!-- 通知：提醒；精确闹钟：待办/闹钟/纪念日 -->
+    <!-- 网络：仅用于「抖音热榜」下拉/按钮刷新时拉取自有 Cloudflare Worker 代理（离线时自动回退本地缓存，不影响纯离线使用） -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />

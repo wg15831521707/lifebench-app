@@ -15,8 +15,8 @@ android {
         minSdk = 26                                   // 最低兼容 Android 8.0
         targetSdk = 34
         // 版本号采用语义化版本 X.Y.Z；versionCode 由 X*10000 + Y*100 + Z 推导（1.0.0 -> 10000），保证单调递增
-        versionCode = 10522
-        versionName = "1.5.22"
+        versionCode = 10523
+        versionName = "1.5.23"
         // Room schema 导出目录：配合 AppDatabase exportSchema=true，便于校验迁移 / 未来 AutoMigration
         javaCompileOptions {
             annotationProcessorOptions {
@@ -99,6 +99,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended") // 全套图标
+    // 下拉刷新（material3 1.2.x 尚无原生 PullToRefreshBox，用 Accompanist 实现，版本与 Compose 1.6.2/Kotlin 1.9.22 对齐）
+    implementation("com.google.accompanist:accompanist-swiperefresh:0.32.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // ===== 导航 =====（navigation-compose 不在 Compose BOM 内，需显式版本，与 Compose 1.6.2 匹配）

@@ -38,24 +38,23 @@ import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.Charset
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.material.icons.filled.Refresh
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 抖音热榜视频墙（占位内容，后续可替换为用户自选视频）。
- * - 离线快照来自 assets/douyin/hotlist.json + 本地压缩封面，无需联网；
+ * - 数据：本地缓存（filesDir）> assets 内嵌快照；联网时下拉/按钮拉取自有 Worker 代理获取实时榜单；
  * - 点击任意卡片 -> 直接拉起抖音官方 App 打开对应搜索；
  *   抖音已安装时【一定打开 App，绝不落浏览器/夸克】：先确认抖音已安装，再全程 setPackage(抖音) 显式启动，
  *   系统绝不会把链接交给浏览器；仅当【确认真的没装抖音】才回退网页版（v1.5.18 根治“夸克里抖音网页”）。
  */
-
-private data class DouyinHotItem(
-    val rank: Int,
-    val title: String,
-    val heat: Long,
-    val label: String?,
-    val videoCount: Int,
-    val cover: String?,
-    val link: String,
-)
 
 /**
  * 跳转抖音：只要设备装了抖音，就【一定打开抖音 App】，绝不会落到浏览器/夸克。
@@ -187,20 +186,47 @@ private fun safeStart(context: Context, intent: Intent, toast: String) {
 fun DouyinWallScreen(nav: NavController) {
     val context = LocalContext.current
     var items by remember { mutableStateOf<List<DouyinHotItem>?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var lastUpdated by remember { mutableStateOf<Long?>(null) }
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        items = withContext(Dispatchers.IO) {
-            runCatching {
-                context.assets.open("douyin/hotlist.json").use { stream ->
-                    val json = stream.readBytes().toString(Charset.forName("UTF-8"))
-                    Gson().fromJson(json, Array<DouyinHotItem>::class.java).toList()
+    fun refresh() {
+        if (isRefreshing) return
+        scope.launch {
+            isRefreshing = true
+            runCatching { DouyinRepository.refresh(context) }
+                .onSuccess { (list, ts) ->
+                    items = list
+                    lastUpdated = ts
+                    Toast.makeText(context, "已更新至最新热榜", Toast.LENGTH_SHORT).show()
                 }
-            }.getOrNull()
+                .onFailure {
+                    Toast.makeText(context, "更新失败，已显示缓存数据", Toast.LENGTH_SHORT).show()
+                }
+            isRefreshing = false
         }
     }
 
+    LaunchedEffect(Unit) {
+        val (list, ts) = DouyinRepository.loadInitial(context)
+        items = list
+        lastUpdated = ts
+        refresh() // 进页面静默拉取一次（失败保持缓存/种子）
+    }
+
     Scaffold(
-        topBar = { AppTopBar("抖音热榜", showBack = true, onBack = { nav.popBackStack() }) },
+        topBar = {
+            AppTopBar(
+                title = "抖音热榜",
+                showBack = true,
+                onBack = { nav.popBackStack() },
+                actions = {
+                    IconButton(onClick = { refresh() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                    }
+                }
+            )
+        },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { pad ->
         if (items == null) {
@@ -215,18 +241,39 @@ fun DouyinWallScreen(nav: NavController) {
             }
             return@Scaffold
         }
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxSize().padding(pad).padding(horizontal = Dimen.s16),
-            verticalArrangement = Arrangement.spacedBy(Dimen.s12),
-            horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
-            contentPadding = PaddingValues(vertical = Dimen.s12)
+        SwipeRefresh(
+            state = rememberSwipeRefreshState(isRefreshing),
+            onRefresh = { refresh() },
+            modifier = Modifier.fillMaxSize().padding(pad)
         ) {
-            items(items = items!!, key = { it.rank }) { item ->
-                DouyinCard(item) { openDouyin(context, item.link) }
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize().padding(horizontal = Dimen.s16),
+                verticalArrangement = Arrangement.spacedBy(Dimen.s12),
+                horizontalArrangement = Arrangement.spacedBy(Dimen.s12),
+                contentPadding = PaddingValues(vertical = Dimen.s12)
+            ) {
+                item(span = { GridItemSpan(2) }) {
+                    lastUpdated?.let { ts ->
+                        Text(
+                            "最近更新：${formatTs(ts)} · 共 ${items!!.size} 条",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = Dimen.s4)
+                        )
+                    }
+                }
+                items(items = items!!, key = { it.rank }) { item ->
+                    DouyinCard(item) { openDouyin(context, item.link) }
+                }
             }
         }
     }
+}
+
+/** 时间戳格式化：MM-dd HH:mm。 */
+private fun formatTs(ts: Long): String {
+    return SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(ts))
 }
 
 @Composable
