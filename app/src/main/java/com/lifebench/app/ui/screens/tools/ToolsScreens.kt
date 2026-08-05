@@ -218,7 +218,8 @@ fun TodoScreen(nav: NavController) {
 
     Scaffold(
         topBar = { AppTopBar("待办备忘录", showBack = true, onBack = { nav.popBackStack() }) },
-        floatingActionButton = { AddFloating { showAdd = true } }
+        floatingActionButton = { AddFloating { showAdd = true } },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
             TabRow(selectedTabIndex = tab) {
@@ -377,7 +378,8 @@ fun PasswordScreen(nav: NavController) {
 
     Scaffold(
         topBar = { AppTopBar("密码保险箱", showBack = true, onBack = { nav.popBackStack() }) },
-        floatingActionButton = { AddFloating { showAdd = true } }
+        floatingActionButton = { AddFloating { showAdd = true } },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
             items(1) {
@@ -447,7 +449,8 @@ fun NoteScreen(nav: NavController) {
 
     Scaffold(
         topBar = { AppTopBar("随手笔记", showBack = true, onBack = { nav.popBackStack() }) },
-        floatingActionButton = { AddFloating { showAdd = true } }
+        floatingActionButton = { AddFloating { showAdd = true } },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
             items(1) {
@@ -505,7 +508,8 @@ fun AnniversaryScreen(nav: NavController) {
 
     Scaffold(
         topBar = { AppTopBar("纪念日倒计时", showBack = true, onBack = { nav.popBackStack() }) },
-        floatingActionButton = { AddFloating { showAdd = true } }
+        floatingActionButton = { AddFloating { showAdd = true } },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad).padding(Dimen.s16)) {
             items(1) {

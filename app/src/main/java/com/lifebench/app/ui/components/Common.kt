@@ -2,6 +2,7 @@ package com.lifebench.app.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,14 +28,17 @@ import com.lifebench.app.ui.theme.LocalExtraColors
  * 通用 UI 组件库：统一卡片、按钮、顶栏、空状态、加载，保证全局视觉一致。
  */
 
-/** 页面顶栏：左标题 + 右侧操作（如主题切换）。 */
+/** 页面顶栏：左标题 + 右侧操作（如主题切换）。
+ *  注意：windowInsets 默认为空（WindowInsets(0,0,0,0)），因为外层 AppNav Scaffold 已通过
+ *  contentWindowInsets = WindowInsets.statusBars 统一处理状态栏间距。若重复消费会导致顶部空白翻倍。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar(
     title: String,
     showBack: Boolean = false,
     onBack: () -> Unit = {},
-    actions: @Composable RowScope.() -> Unit = {}
+    actions: @Composable RowScope.() -> Unit = {},
+    windowInsets: WindowInsets = WindowInsets(0, 0, 0, 0)
 ) {
     TopAppBar(
         title = { Text(title, fontWeight = FontWeight.SemiBold) },
@@ -46,7 +50,8 @@ fun AppTopBar(
         actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background
-        )
+        ),
+        windowInsets = windowInsets
     )
 }
 

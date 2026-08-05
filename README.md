@@ -18,9 +18,14 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.21`（`versionCode 10521`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.22`（`versionCode 10522`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.22 (2026-08-05, patch) — 子页面状态栏留白修复：消除双重 padding
+- **修复：14 个子页面（番茄钟/睡眠/记账/饮食/设置/待办/密码/笔记/纪念日/习惯/抖音热榜/舒尔特方格/全局设置/关于）顶部出现大块空白（约 60-80dp）**。
+- 根因：外层 `AppNav` Scaffold 已通过 `contentWindowInsets = WindowInsets.statusBars` 为所有页面统一注入状态栏间距；但每个子页面的 `AppTopBar`（即 M3 `TopAppBar`，默认 `windowInsets=statusBars`）与内层 `Scaffold` 又各自重复消费一次状态栏 insets → **padding 双重叠加**。
+- 修复：`AppTopBar` 新增 `windowInsets` 参数默认 `WindowInsets(0,0,0,0)`（外层已处理，无需重复）；6 个内层 `Scaffold`（待办/密码/笔记/纪念日/习惯打卡/抖音热榜）补 `contentWindowInsets = WindowInsets(0,0,0,0)`。全部子页面顶部间距收敛到与 Tab 页一致。
 
 ### v1.5.21 (2026-08-04, patch) — 视觉与留白优化：暗色切换入卡、查看弱化、零态缩小、全局去冗余标题栏
 - **暗色模式切换移入问候卡**：工作台顶部的月亮/太阳切换按钮从顶部标题行移到「问候卡」右上角，替换原「浩」头像徽章，顶栏更简洁、操作更顺手。

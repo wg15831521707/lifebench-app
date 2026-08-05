@@ -54,7 +54,8 @@ fun HabitScreen(nav: NavController) {
 
     Scaffold(
         topBar = { AppTopBar("习惯打卡", showBack = true, onBack = { nav.popBackStack() }) },
-        floatingActionButton = { AddFloating { showAdd = true } }
+        floatingActionButton = { AddFloating { showAdd = true } },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState())) {
             Spacer(Modifier.height(Dimen.s12))

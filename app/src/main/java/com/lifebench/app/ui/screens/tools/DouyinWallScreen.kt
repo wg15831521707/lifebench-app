@@ -200,7 +200,8 @@ fun DouyinWallScreen(nav: NavController) {
     }
 
     Scaffold(
-        topBar = { AppTopBar("抖音热榜", showBack = true, onBack = { nav.popBackStack() }) }
+        topBar = { AppTopBar("抖音热榜", showBack = true, onBack = { nav.popBackStack() }) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { pad ->
         if (items == null) {
             Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
