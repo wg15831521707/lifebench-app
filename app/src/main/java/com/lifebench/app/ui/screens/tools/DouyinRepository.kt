@@ -121,7 +121,7 @@ object DouyinRepository {
                     rank = rank,
                     title = it.title ?: "无标题",
                     heat = it.heat ?: 0,
-                    label = it.label,
+                    label = normalizeLabel(it.label),
                     videoCount = it.videoCount ?: 0,
                     // 线上无封面：按 rank 复用本地 covers/{rank:02d}.jpg，缺失则卡片占位
                     cover = "covers/${String.format("%02d", rank)}.jpg",
@@ -139,8 +139,27 @@ object DouyinRepository {
         @SerializedName("rank") val rank: Int?,
         @SerializedName("title") val title: String?,
         @SerializedName("heat") val heat: Long?,
-        @SerializedName("label") val label: String?,
+        // 注意：远端 label 可能是字符串("热"/"沸")也可能是数字(1/2/3)，用 Any? 兜底避免 Gson 抛异常导致整批解析失败
+        @SerializedName("label") val label: Any?,
         @SerializedName("videoCount") val videoCount: Int?,
         @SerializedName("link") val link: String?,
     )
+
+    /**
+     * 标签归一化：远端可能返回字符串("热"/"沸"/"新")或数字(1/2/3 对应 沸/新/热)，
+     * 统一为界面展示用字符串。返回 null 表示无标签。
+     */
+    private fun normalizeLabel(value: Any?): String? {
+        if (value == null) return null
+        return when (value) {
+            is String -> value.takeIf { it.isNotBlank() }
+            is Number -> when (value.toInt()) {
+                1 -> "沸"
+                2 -> "新"
+                3 -> "热"
+                else -> null
+            }
+            else -> value.toString().takeIf { it.isNotBlank() }
+        }
+    }
 }

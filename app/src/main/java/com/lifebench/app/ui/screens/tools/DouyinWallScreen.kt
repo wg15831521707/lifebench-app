@@ -201,7 +201,8 @@ fun DouyinWallScreen(nav: NavController) {
                     Toast.makeText(context, "已更新至最新热榜", Toast.LENGTH_SHORT).show()
                 }
                 .onFailure {
-                    Toast.makeText(context, "更新失败，已显示缓存数据", Toast.LENGTH_SHORT).show()
+                    val msg = it.message?.takeIf { m -> m.isNotBlank() } ?: "未知错误"
+                    Toast.makeText(context, "更新失败：${msg.take(40)}（已显示缓存）", Toast.LENGTH_LONG).show()
                 }
             isRefreshing = false
         }

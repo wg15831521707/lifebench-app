@@ -64,6 +64,15 @@ function fetchDouyin() {
   });
 }
 
+/** 标签归一化：抖音可能返回字符串("热"/"沸"/"新")或数字(1/2/3)，统一为展示字符串 */
+function normalizeLabel(v) {
+  if (v == null) return null;
+  if (typeof v === 'string') return v.trim() || null;
+  const n = Number(v);
+  if (Number.isNaN(n)) return String(v);
+  return { 1: '沸', 2: '新', 3: '热' }[n] || null;
+}
+
 /** 归一化为 App 所需的条目形状：{rank,title,heat,label,videoCount,link} */
 function normalize(raw) {
   const list = (raw && raw.data && raw.data.word_list) || [];
@@ -71,7 +80,7 @@ function normalize(raw) {
     rank: i + 1,
     title: it.word || '无标题',
     heat: Number(it.hot_value) || 0,
-    label: it.label || null,
+    label: normalizeLabel(it.label),
     videoCount: Number(it.video_count) || 0,
     link:
       it.url ||
