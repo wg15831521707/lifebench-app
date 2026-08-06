@@ -14,7 +14,7 @@ import java.nio.charset.Charset
  * 抖音热榜数据仓库：本地缓存 + 自有 Worker 代理拉取，保持「离线优先」。
  *
  * - 展示数据优先级：本地缓存文件 > assets 内嵌快照（首次种子）。
- * - 刷新：下拉/按钮触发，拉取自有 Cloudflare Worker（仅此一处联网）；
+ * - 刷新：下拉/按钮触发，拉取自有阿里云函数计算 FC 代理（仅此一处联网）；
  *   成功覆盖缓存并更新时间戳；失败由调用方降级显示缓存。
  * - 封面：线上接口不返回封面，按 rank 复用本地 assets/douyin/covers/{rank:02d}.jpg，
  *   缺失时卡片自动回退品牌渐变占位。
@@ -32,10 +32,11 @@ data class DouyinHotItem(
 )
 
 /**
- * 热榜代理地址（Cloudflare Worker，绑定自有域名 hotlist.xiaomanapp.top）。
- * 国内可正常访问，不再依赖 *.workers.dev（该域名在中国大陆被 DNS 污染）。
+ * 热榜代理地址（阿里云函数计算 FC，自带 *.fcapp.run 国内可直连域名，无需备案）。
+ * 部署后请将下方占位符替换为你的 FC HTTP 触发器公网地址
+ * （形如 https://xxxx.cn-hangzhou.fcapp.run/，详见 fc-douyin-hot/ 目录）。
  */
-private const val HOTLIST_API = "https://hotlist.xiaomanapp.top/hotlist"
+private const val HOTLIST_API = "https://douyin-ot-proxy-rzglldiree.cn-hangzhou.fcapp.run/"
 
 private const val CACHE_FILE = "douyin_hotlist_cache.json"
 private const val SEED_ASSET = "douyin/hotlist.json"
@@ -98,7 +99,7 @@ object DouyinRepository {
     }
 
     private fun fetchRemote(): List<DouyinHotItem> {
-        if (HOTLIST_API.contains("REPLACE_WITH_YOUR_WORKER")) {
+        if (HOTLIST_API.contains("REPLACE")) {
             throw IllegalStateException("Worker 地址未配置")
         }
         val conn = (URL(HOTLIST_API).openConnection() as HttpURLConnection).apply {
