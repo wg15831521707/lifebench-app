@@ -33,14 +33,13 @@ data class DouyinHotItem(
 
 /**
  * 热榜代理地址（阿里云函数计算 FC，自带 *.fcapp.run 国内可直连域名，无需备案）。
- * 部署后请将下方占位符替换为你的 FC HTTP 触发器公网地址
- * （形如 https://xxxx.cn-hangzhou.fcapp.run/，详见 fc-douyin-hot/ 目录）。
  */
 private const val HOTLIST_API = "https://douyin-ot-proxy-rzglldiree.cn-hangzhou.fcapp.run/"
 
 private const val CACHE_FILE = "douyin_hotlist_cache.json"
 private const val SEED_ASSET = "douyin/hotlist.json"
-private const val NET_TIMEOUT = 10_000
+private const val NET_TIMEOUT = 12_000
+private const val TAG = "DouyinRepo"
 
 object DouyinRepository {
 
@@ -63,7 +62,7 @@ object DouyinRepository {
         }
 
     /**
-     * 刷新：拉取 Worker 代理，成功覆盖缓存并返回 (列表, 当前时间戳)。
+     * 刷新：拉取 FC 代理，成功覆盖缓存并返回 (列表, 当前时间戳)。
      * 失败抛异常，由调用方降级到已显示的缓存数据。
      */
     suspend fun refresh(context: Context): Pair<List<DouyinHotItem>, Long> =
@@ -102,6 +101,7 @@ object DouyinRepository {
         if (HOTLIST_API.contains("REPLACE")) {
             throw IllegalStateException("Worker 地址未配置")
         }
+        Log.d(TAG, "→ 开始请求 $HOTLIST_API")
         val conn = (URL(HOTLIST_API).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = NET_TIMEOUT
@@ -109,12 +109,21 @@ object DouyinRepository {
             setRequestProperty("Accept", "application/json")
         }
         try {
-            if (conn.responseCode != HttpURLConnection.HTTP_OK) {
-                throw IllegalStateException("Worker HTTP ${conn.responseCode}")
+            Log.d(TAG, "→ 已连接，等待响应码...")
+            val responseCode = conn.responseCode
+            Log.d(TAG, "→ 响应码: HTTP $responseCode")
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                val errBody = conn.errorStream?.bufferedReader()?.use { it.readText() }?.take(200) ?: ""
+                throw IllegalStateException("HTTP $responseCode: $errBody")
             }
             val body = conn.inputStream.bufferedReader(Charset.forName("UTF-8")).use { it.readText() }
+            Log.d(TAG, "→ 响应体长度: ${body.length} 字符, 前100字: ${body.take(100)}")
             val arr = gson.fromJson(body, Array<RemoteItem>::class.java)
-                ?: throw IllegalStateException("空响应")
+                ?: throw IllegalStateException("Gson 解析结果为 null")
+            Log.d(TAG, "→ Gson 解析成功，共 ${arr.size} 条，开始归一化...")
+            arr.take(3).forEachIndexed { idx, item ->
+                Log.d(TAG, "  [$idx] label=${item.label} (type=${item.label?.javaClass?.simpleName})")
+            }
             return arr.mapIndexed { i, it ->
                 val rank = i + 1
                 DouyinHotItem(
@@ -123,12 +132,16 @@ object DouyinRepository {
                     heat = it.heat ?: 0,
                     label = normalizeLabel(it.label),
                     videoCount = it.videoCount ?: 0,
-                    // 线上无封面：按 rank 复用本地 covers/{rank:02d}.jpg，缺失则卡片占位
                     cover = "covers/${String.format("%02d", rank)}.jpg",
                     link = it.link
                         ?: "https://www.douyin.com/search/${java.net.URLEncoder.encode(it.title ?: "", "UTF-8")}"
                 )
+            }.also {
+                Log.d(TAG, "→ 归一化完成，返回 ${it.size} 条（首条: ${it.firstOrNull()?.title}）")
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ 请求失败: ${e.javaClass.simpleName}: ${e.message}", e)
+            throw e
         } finally {
             conn.disconnect()
         }
@@ -139,7 +152,6 @@ object DouyinRepository {
         @SerializedName("rank") val rank: Int?,
         @SerializedName("title") val title: String?,
         @SerializedName("heat") val heat: Long?,
-        // 注意：远端 label 可能是字符串("热"/"沸")也可能是数字(1/2/3)，用 Any? 兜底避免 Gson 抛异常导致整批解析失败
         @SerializedName("label") val label: Any?,
         @SerializedName("videoCount") val videoCount: Int?,
         @SerializedName("link") val link: String?,
