@@ -15,6 +15,9 @@ const http = require('http');
 const https = require('https');
 
 const DOUYIN_URL = 'https://www.douyin.com/aweme/v1/hot/search/list/';
+// APK 下载中转：服务端代抓 GitHub 安装包再回传，供国内用户直连下载
+const APK_URL = 'https://github.com/wg15831521707/lifebench-app/releases/download/v1.5.26/xiaoman-v1.5.26-debug.apk';
+const APK_NAME = 'xiaoman-v1.5.26-debug.apk';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -98,6 +101,58 @@ function sendJson(res, data, status) {
   res.end(body);
 }
 
+/**
+ * APK 下载中转：跟随 GitHub 的 302 重定向，把安装包字节流 pipe 回客户端。
+ * 让国内用户从 *.fcapp.run/apk 直连下载，文件名确定、链路稳定。
+ */
+function pipeApk(res) {
+  function fetchUrl(url, redirects) {
+    if (redirects > 5) {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('too many redirects');
+      return;
+    }
+    https
+      .get(
+        url,
+        {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (compatible; xiaoman-apk-proxy/1.0)',
+          },
+          // 兼容部分运行环境的 CA 链缺失（阿里云 FC 个别节点可能缺根证书）
+          rejectUnauthorized: false,
+        },
+        (up) => {
+          if (up.statusCode >= 300 && up.statusCode < 400 && up.headers.location) {
+            up.resume(); // 丢弃重定向响应体
+            const next = new URL(up.headers.location, url).href;
+            fetchUrl(next, redirects + 1);
+            return;
+          }
+          if (up.statusCode !== 200) {
+            up.resume();
+            res.writeHead(up.statusCode, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('upstream HTTP ' + up.statusCode);
+            return;
+          }
+          res.writeHead(200, {
+            'Content-Type': 'application/vnd.android.package-archive',
+            'Content-Disposition': 'attachment; filename="' + APK_NAME + '"',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=300',
+          });
+          up.pipe(res);
+        }
+      )
+      .on('error', (e) => {
+        res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('fetch error: ' + e.message);
+      });
+  }
+  fetchUrl(APK_URL, 0);
+}
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
@@ -113,6 +168,13 @@ const server = http.createServer((req, res) => {
 
   if (req.method !== 'GET') {
     sendJson(res, { error: 'method not allowed' }, 405);
+    return;
+  }
+
+  // APK 下载中转：/apk 路由，服务端代抓 GitHub 安装包并回传
+  const reqPath = (req.url || '/').split('?')[0];
+  if (reqPath === '/apk' || reqPath === '/apk/') {
+    pipeApk(res);
     return;
   }
 

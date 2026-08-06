@@ -313,28 +313,10 @@
         document.body.removeChild(t);
       }
 
-      // 下载：用 Blob 强制保存为 .apk（绕过服务器重定向/文件名导致的 .bin 后缀问题）
+      // 下载：走浏览器原生下载（最稳，自动处理重定向/断点/跨域），不拦截默认行为
       var dl = document.getElementById("dl");
-      dl.addEventListener("click", function(e){
-        if(!window.fetch || !window.URL || !URL.createObjectURL) return; // 不支持则走浏览器原生下载
-        e.preventDefault();
-        var url = dl.getAttribute("href");
-        var fname = dl.getAttribute("download") || "小满.apk";
-        showToast("正在准备安装包…");
-        fetch(url).then(function(r){
-          if(!r.ok) throw new Error("net " + r.status);
-          return r.blob();
-        }).then(function(blob){
-          var bUrl = URL.createObjectURL(new Blob([blob], {type:"application/vnd.android.package-archive"}));
-          var a = document.createElement("a");
-          a.href = bUrl; a.download = fname;
-          document.body.appendChild(a); a.click(); document.body.removeChild(a);
-          setTimeout(function(){ URL.revokeObjectURL(bUrl); }, 5000);
-          showToast("已开始下载");
-        }).catch(function(){
-          showToast("正在直连下载…");
-          window.location.href = url; // 回退：直接跳转（可能带 .bin，但能下载）
-        });
+      dl.addEventListener("click", function(){
+        showToast("正在下载安装包…");
       });
     })();
 
