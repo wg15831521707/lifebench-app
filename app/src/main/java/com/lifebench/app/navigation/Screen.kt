@@ -27,7 +27,4 @@ object Routes {
 
     // —— 脑力训练 ——
     const val SCHULTE = "schulte"                 // 舒尔特方格（唯一保留的训练模块）
-
-    // —— 娱乐发现 ——
-    const val DOUYIN_WALL = "douyin_wall"         // 抖音热榜视频墙（点击跳转抖音 App）
 }

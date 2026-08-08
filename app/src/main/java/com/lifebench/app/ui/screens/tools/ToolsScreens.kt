@@ -94,9 +94,6 @@ fun ToolsHubScreen(nav: NavController) {
         ToolMeta("随手笔记", "灵感随时记录", Icons.Filled.Note, Routes.NOTE, 0),
         ToolMeta("纪念日倒计时", "重要日子不错过", Icons.Filled.Celebration, Routes.ANNIVERSARY, 1),
     )
-    val discover = listOf(
-        ToolMeta("抖音热榜", "热门视频一键直达抖音", Icons.Filled.SmartDisplay, Routes.DOUYIN_WALL, 1),
-    )
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize().padding(horizontal = Dimen.s16),
@@ -108,8 +105,6 @@ fun ToolsHubScreen(nav: NavController) {
         items(efficiency) { ToolTile(it) { nav.navigate(it.route) } }
         items(1, span = { GridItemSpan(2) }) { HubSectionHeader("安全与记录", Icons.Filled.VerifiedUser) }
         items(safety) { ToolTile(it) { nav.navigate(it.route) } }
-        items(1, span = { GridItemSpan(2) }) { HubSectionHeader("发现", Icons.Filled.Explore) }
-        items(discover) { ToolTile(it) { nav.navigate(it.route) } }
     }
 }
 

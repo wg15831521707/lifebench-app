@@ -100,9 +100,6 @@ fun AppNav() {
 
             // —— 舒尔特方格（专注力训练）——
             composable(Routes.SCHULTE, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { SchulteScreen(nav) }
-
-            // —— 抖音热榜视频墙（娱乐发现）——
-            composable(Routes.DOUYIN_WALL, enterTransition = enterT, exitTransition = exitT, popEnterTransition = popEnterT, popExitTransition = popExitT) { DouyinWallScreen(nav) }
         }
     }
 }

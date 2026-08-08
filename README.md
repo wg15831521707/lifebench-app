@@ -18,9 +18,14 @@
 | 其他 | Gson 2.10.1（备份导入导出）、Kotlin 协程 1.7.3、kapt |
 | 构建 | Gradle 8.6 + Android Gradle Plugin 8.3.2 |
 
-**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.22`（`versionCode 10522`）；包名 `com.lifebench.app`。
+**版本与兼容**：`compileSdk 34` / `minSdk 26`（Android 8.0+）/ `targetSdk 34`；当前版本 `versionName 1.5.27`（`versionCode 10527`）；包名 `com.lifebench.app`。
 
 ## 更新日志
+
+### v1.5.27 (2026-08-08, patch) — 移除抖音热榜模块：回归纯本地、零网络
+- **移除抖音热榜功能**：删除工具页/首页「全部工具」的「抖音热榜」入口、抖音视频墙页面（`DouyinWallScreen.kt`）、数据层（`DouyinRepository.kt`）、本地封面资源（`assets/douyin/`）、阿里云函数计算 FC 代理源码（`fc-douyin-hot/`）。
+- **权限与依赖精简**：移除 `INTERNET` 权限与抖音相关 `<queries>` 包可见性声明；卸载 `accompanist-swiperefresh` 依赖（下拉刷新仅抖音页使用）。应用彻底不再依赖任何网络。
+- **背景**：云账号产生费用且该功能非核心，按用户要求下掉以降本、回归「离线优先 · 无广告 · 数据本地加密」的初衷。
 
 ### v1.5.22 (2026-08-05, patch) — 子页面状态栏留白修复：消除双重 padding
 - **修复：14 个子页面（番茄钟/睡眠/记账/饮食/设置/待办/密码/笔记/纪念日/习惯/抖音热榜/舒尔特方格/全局设置/关于）顶部出现大块空白（约 60-80dp）**。

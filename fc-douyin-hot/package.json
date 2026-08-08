@@ -1,9 +1,0 @@
-{
-  "name": "douyin-hot-proxy",
-  "version": "1.0.0",
-  "private": true,
-  "description": "抖音热榜代理 — 阿里云函数计算 FC (Node.js Web 函数)",
-  "scripts": {
-    "start": "node index.js"
-  }
-}
