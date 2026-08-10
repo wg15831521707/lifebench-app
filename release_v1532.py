@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-# 小满 v1.5.32 发版脚本
+# 小满 v1.5.32 发版脚本（资产名去除 -debug 字样，改为 -release.apk）
 # 用法：GH_PAT=xxx python release_v1532.py
 # 注意：token 仅从环境变量读取，绝不明文写入文件（避免触发 GitHub 密钥扫描）。
+# 幂等：若 v1.5.32 Release 已存在，则删除旧 apk 资产后重新上传，不会因重复创建而 409。
 import os
 import json
 import urllib.request
+import urllib.error
 
 TOK = os.environ.get("GH_PAT")
 if not TOK:
@@ -12,7 +14,7 @@ if not TOK:
 
 REPO = "wg15831521707/lifebench-app"
 TAG = "v1.5.32"
-NAME = f"xiaoman-{TAG}-debug.apk"
+NAME = f"xiaoman-{TAG}-release.apk"
 APK = "app/build/outputs/apk/release/app-release.apk"
 H = {
     "Authorization": f"Bearer {TOK}",
@@ -31,17 +33,31 @@ BODY = """\
 def req(method, url, data=None):
     body = json.dumps(data).encode() if data is not None else None
     r = urllib.request.Request(url, data=body, headers=H, method=method)
-    with urllib.request.urlopen(r, timeout=120) as resp:
-        return resp.read().decode(), resp.status
+    try:
+        with urllib.request.urlopen(r, timeout=120) as resp:
+            return resp.read().decode(), resp.status
+    except urllib.error.HTTPError as e:
+        return e.read().decode(), e.code
 
-# 1) 创建 Release（取返回的 id 用于上传）
-payload = {"tag_name": TAG, "name": TAG, "body": BODY, "draft": False, "prerelease": False}
-raw, _ = req("POST", f"https://api.github.com/repos/{REPO}/releases", payload)
-rel = json.loads(raw)
-rel_id = rel["id"]
-print("release created:", TAG, "id=", rel_id)
+# 1) 获取已存在的 Release（v1.5.32 应已存在），不存在则创建
+raw, status = req("GET", f"https://api.github.com/repos/{REPO}/releases/tags/{TAG}")
+if status == 200:
+    rel = json.loads(raw)
+    rel_id = rel["id"]
+    print("release exists:", TAG, "id=", rel_id)
+    # 清理旧 apk 资产（如旧 xiaoman-v1.5.32-debug.apk），避免重复
+    for a in rel.get("assets", []):
+        if a["name"].startswith(f"xiaoman-{TAG}"):
+            req("DELETE", f"https://api.github.com/repos/{REPO}/assets/{a['id']}")
+            print("deleted old asset:", a["name"])
+else:
+    payload = {"tag_name": TAG, "name": TAG, "body": BODY, "draft": False, "prerelease": False}
+    raw, _ = req("POST", f"https://api.github.com/repos/{REPO}/releases", payload)
+    rel = json.loads(raw)
+    rel_id = rel["id"]
+    print("release created:", TAG, "id=", rel_id)
 
-# 2) 上传资产
+# 2) 上传资产（新文件名，去除 -debug 字样）
 with open(APK, "rb") as f:
     asset = f.read()
 r = urllib.request.Request(
