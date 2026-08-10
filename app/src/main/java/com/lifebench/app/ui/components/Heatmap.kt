@@ -34,7 +34,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,6 +58,7 @@ import java.util.Calendar
  * - 修复「看不出格子」：每个日期格加发丝级边框（outlineVariant），空格填充明显浅于背景，网格始终清晰。
  * - 修复「不知打卡了哪个习惯」：① 常驻「习惯图例」（每习惯色块+emoji+名）；② 点击已打卡日弹窗列出当天各习惯。
  * - 交互：上滑/下箭头看更早月份，下滑/上箭头看更新月份；月度切换带竖向滑入滑出动画。
+ * - 切月手势与整页滚动互不抢占：拖拽切月期间通过 nestedScroll 拦截，外层 verticalScroll 不跟着滚，松手后恢复。
  * - 沿用 heatColor 强度色阶、今日高亮主色边框、未来日期置灰不可点、纯本地无网络。
  */
 @Composable
@@ -98,6 +103,15 @@ fun HabitHeatmap(
 
     var sel by remember { mutableStateOf(0) }
     var sheetDay by remember { mutableStateOf<Long?>(null) }
+    // 切月拖拽进行中标记：拖拽期间吞掉竖向滚动，外层整页 verticalScroll 不抢滚动
+    var isDraggingMonth by remember { mutableStateOf(false) }
+    val monthSwipeNestedScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                return if (isDraggingMonth && source == NestedScrollSource.Drag) available else Offset.Zero
+            }
+        }
+    }
     val habitById = remember(habits) { habits.associateBy { it.id } }
 
     Column(modifier.fillMaxWidth()) {
@@ -141,18 +155,21 @@ fun HabitHeatmap(
             }
         }
 
-        // 日历区：上下拖拽切换月份（上滑看更早、下滑看更新）
+        // 日历区：上下拖拽切换月份（上滑看更早、下滑看更新）；拖拽期间拦截外层整页竖向滚动
         var dragAccum by remember { mutableStateOf(0f) }
         Box(
             Modifier.fillMaxWidth()
                 .draggable(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { dragAccum += it },
+                    onDragStarted = { isDraggingMonth = true },
                     onDragStopped = { velocity ->
                         if (velocity < -300f) sel = (sel + 1).coerceAtMost(monthsBack)   // 上滑看更早
                         else if (velocity > 300f) sel = (sel - 1).coerceAtLeast(0)        // 下滑看更新
+                        isDraggingMonth = false
                     }
                 )
+                .nestedScroll(monthSwipeNestedScroll)
         ) {
             AnimatedContent(
                 targetState = sel,
