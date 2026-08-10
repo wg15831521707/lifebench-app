@@ -1,63 +1,77 @@
 package com.lifebench.app.ui.components
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lifebench.app.data.entity.HabitCheckInEntity
+import com.lifebench.app.data.entity.HabitEntity
 import com.lifebench.app.ui.theme.Dimen
+import com.lifebench.app.ui.theme.habitDotColor
 import com.lifebench.app.util.TimeUtil
 import java.util.Calendar
 
 /**
- * 竖向堆叠月历热力图（折叠手风琴版）：展示最近 monthsBack+1 个月（含本月）。
- * - 当前月（列表首个）默认完整展开；历史月份折叠为单行摘要，点一下原地展开。
- * - 折叠态单行：月份标题 + 「打卡 X/Y 天」+ 一行迷你热度条，高度约 1 屏首屏即可见全部月份。
- * - 展开态沿用原竖向月历：完整星期表头 + 日期网格，今日高亮边框，点击提示「日期 + 次数」。
- * - 月头显示「2026年8月」并标注「本月」，年份一目了然（修复：原横向条只显示"M月"无法分辨年份）。
- * - 纯竖向滚动，无需左右拖动（修复：原 53 列横向条在手机上拖动不便）。
+ * 单月热力图（上下滑动切月版）：同一时刻只显示一个月份，刷动或点箭头切换。
+ * - 修复「太长」：不再平铺 12 个月，固定只显示当前月，整卡约 1 屏。
+ * - 修复「看不出格子」：每个日期格加发丝级边框（outlineVariant），空格填充明显浅于背景，网格始终清晰。
+ * - 修复「不知打卡了哪个习惯」：① 常驻「习惯图例」（每习惯色块+emoji+名）；② 点击已打卡日弹窗列出当天各习惯。
+ * - 交互：上滑/下箭头看更早月份，下滑/上箭头看更新月份；月度切换带竖向滑入滑出动画。
+ * - 沿用 heatColor 强度色阶、今日高亮主色边框、未来日期置灰不可点、纯本地无网络。
  */
 @Composable
 fun HabitHeatmap(
     data: Map<Long, Int>,
+    habits: List<HabitEntity> = emptyList(),
+    checkInsByDay: Map<Long, List<HabitCheckInEntity>> = emptyMap(),
     modifier: Modifier = Modifier,
     monthsBack: Int = 11
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
-    val context = LocalContext.current
-    val cellGap = 4.dp
-    val radius = 6.dp
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     val todayKey = TimeUtil.dayKey()
     val weekLabels = listOf("日", "一", "二", "三", "四", "五", "六")
+    val cellGap = 4.dp
+    val radius = 6.dp
 
-    // 预生成月份与每日 dayKey（仅月份范围变化时重建）
     val months = remember(monthsBack) {
         val cal = Calendar.getInstance()
         cal.set(Calendar.DAY_OF_MONTH, 1)
@@ -82,157 +96,98 @@ fun HabitHeatmap(
         list
     }
 
-    // 折叠状态：index 0（当前月）默认展开，其余折叠
-    val expanded = remember(monthsBack) {
-        mutableStateListOf<Boolean>().apply {
-            add(true)
-            repeat(monthsBack) { add(false) }
-        }
-    }
+    var sel by remember { mutableStateOf(0) }
+    var sheetDay by remember { mutableStateOf<Long?>(null) }
+    val habitById = remember(habits) { habits.associateBy { it.id } }
 
     Column(modifier.fillMaxWidth()) {
-        months.forEachIndexed { index, mo ->
-            val isCurrent = index == 0
-            val isExpanded = expanded[index]
-            val checkedCount = mo.dayKeys.count { (data[it] ?: 0) > 0 }
-
-            // 月份头（常驻，点击切换展开/收起）
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 44.dp)
-                    .clickable { expanded[index] = !expanded[index] }
-                    .padding(vertical = Dimen.s8, horizontal = Dimen.s4),
-                verticalAlignment = Alignment.CenterVertically
+        // 月份头：标题 + 本月标签 + 上下箭头（可发现 / 无障碍入口）
+        val mo = months[sel]
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = Dimen.s4, horizontal = Dimen.s4),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "${mo.year}年${mo.month + 1}月",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (sel == 0) {
+                Spacer(Modifier.width(6.dp))
+                Surface(shape = RoundedCornerShape(6.dp), color = primary.copy(alpha = 0.15f)) {
+                    Text(
+                        "本月",
+                        fontSize = 10.sp,
+                        color = primary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            IconButton(
+                onClick = { if (sel > 0) sel-- },
+                enabled = sel > 0,
+                modifier = Modifier.size(36.dp)
             ) {
-                Text(
-                    "${mo.year}年${mo.month + 1}月",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                if (isCurrent) {
-                    Spacer(Modifier.width(6.dp))
-                    Surface(shape = RoundedCornerShape(6.dp), color = primary.copy(alpha = 0.15f)) {
-                        Text(
-                            "本月",
-                            fontSize = 10.sp,
-                            color = primary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "打卡 $checkedCount/${mo.dayKeys.size} 天",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(2.dp))
-                val rotation = animateFloatAsState(
-                    targetValue = if (isExpanded) 180f else 0f,
-                    label = "chevron"
-                )
-                Icon(
-                    imageVector = Icons.Filled.ExpandMore,
-                    contentDescription = if (isExpanded) "收起" else "展开",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = rotation.value }
-                )
+                Icon(Icons.Filled.KeyboardArrowUp, "查看更新的月份", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
-            // 折叠态：迷你热度条（单行，直观反映每日强度分布）
-            if (!isExpanded) {
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = Dimen.s4, horizontal = Dimen.s4),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    mo.dayKeys.forEach { dk ->
-                        val count = data[dk] ?: 0
-                        val level = when {
-                            dk > todayKey -> -1
-                            count <= 0 -> 0
-                            count == 1 -> 1
-                            count == 2 -> 2
-                            count == 3 -> 3
-                            else -> 4
-                        }
-                        Box(
-                            Modifier.height(10.dp).weight(1f)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(heatColor(level, primary, surfaceVariant))
-                        )
-                    }
-                }
-            }
-
-            // 展开态：完整月历（带展开/收起动画）
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+            IconButton(
+                onClick = { if (sel < monthsBack) sel++ },
+                enabled = sel < monthsBack,
+                modifier = Modifier.size(36.dp)
             ) {
-                Column {
-                    // 星期表头
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(cellGap)) {
-                        weekLabels.forEach {
-                            Text(
-                                it,
-                                Modifier.weight(1f),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(cellGap))
-                    // 日期网格
-                    val total = mo.firstDow + mo.dayKeys.size
-                    val rows = (total + 6) / 7
-                    Column(verticalArrangement = Arrangement.spacedBy(cellGap)) {
-                        repeat(rows) { r ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(cellGap)) {
-                                repeat(7) { c ->
-                                    val pos = r * 7 + c
-                                    if (pos < mo.firstDow || pos >= mo.firstDow + mo.dayKeys.size) {
-                                        Box(Modifier.weight(1f).aspectRatio(1f)) {}
-                                    } else {
-                                        val dayKey = mo.dayKeys[pos - mo.firstDow]
-                                        val count = data[dayKey] ?: 0
-                                        val future = dayKey > todayKey
-                                        val isToday = dayKey == todayKey
-                                        val level = when {
-                                            future -> -1
-                                            count <= 0 -> 0
-                                            count == 1 -> 1
-                                            count == 2 -> 2
-                                            count == 3 -> 3
-                                            else -> 4
-                                        }
-                                        Box(
-                                            Modifier.weight(1f).aspectRatio(1f)
-                                                .clip(RoundedCornerShape(radius))
-                                                .background(heatColor(level, primary, surfaceVariant))
-                                                .then(if (isToday) Modifier.border(1.5.dp, primary, RoundedCornerShape(radius)) else Modifier)
-                                                .clickable {
-                                                    val tip = if (future) "未来日期"
-                                                    else "${TimeUtil.formatDate(dayKey)} · 打卡 $count 次"
-                                                    Toast.makeText(context, tip, Toast.LENGTH_SHORT).show()
-                                                }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(Dimen.s12))
-                }
+                Icon(Icons.Filled.KeyboardArrowDown, "查看更早的月份", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
-            // 月份之间间距
-            Spacer(Modifier.height(Dimen.s12))
         }
 
-        // 图例
+        // 日历区：上下拖拽切换月份（上滑看更早、下滑看更新）
+        var dragAccum by remember { mutableStateOf(0f) }
+        Box(
+            Modifier.fillMaxWidth()
+                .draggable(
+                    orientation = Orientation.Vertical,
+                    state = rememberDraggableState { dragAccum += it },
+                    onDragStopped = { velocity ->
+                        if (velocity < -300f) sel = (sel + 1).coerceAtMost(monthsBack)   // 上滑看更早
+                        else if (velocity > 300f) sel = (sel - 1).coerceAtLeast(0)        // 下滑看更新
+                    }
+                )
+        ) {
+            AnimatedContent(
+                targetState = sel,
+                transitionSpec = {
+                    val dir = if (targetState > initialState) 1 else -1
+                    (slideInVertically { h -> dir * h } + fadeIn()) togetherWith
+                        (slideOutVertically { h -> -dir * h } + fadeOut())
+                },
+                label = "monthSwitch"
+            ) { idx ->
+                MonthCalendar(
+                    month = months[idx],
+                    data = data,
+                    checkInsByDay = checkInsByDay,
+                    primary = primary,
+                    surfaceVariant = surfaceVariant,
+                    outlineVariant = outlineVariant,
+                    cellGap = cellGap,
+                    radius = radius,
+                    todayKey = todayKey,
+                    weekLabels = weekLabels,
+                    onDayClick = { sheetDay = it }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(Dimen.s12))
+
+        // 习惯图例：让用户知道「哪个颜色对应哪个习惯」
+        if (habits.isNotEmpty()) {
+            HabitLegend(habits = habits)
+            Spacer(Modifier.height(Dimen.s8))
+        }
+
+        // 强度图例（少 → 多）
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(cellGap)
@@ -242,9 +197,151 @@ fun HabitHeatmap(
                 Box(
                     Modifier.size(14.dp).clip(RoundedCornerShape(radius))
                         .background(heatColor(i - 1, primary, surfaceVariant))
+                        .border(1.dp, outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(radius))
                 )
             }
             Text("多", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    // 当日明细：点击已打卡日，列出当天各习惯（色块 + emoji + 名）
+    sheetDay?.let { dayKey ->
+        val items = checkInsByDay[dayKey].orEmpty()
+        AlertDialog(
+            onDismissRequest = { sheetDay = null },
+            confirmButton = { TextButton(onClick = { sheetDay = null }) { Text("关闭") } },
+            title = { Text("${TimeUtil.formatDate(dayKey)} · 打卡 ${items.size} 个习惯") },
+            text = {
+                if (items.isEmpty()) {
+                    Text("这一天没有打卡记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Column {
+                        items.forEach { ci ->
+                            habitById[ci.habitId]?.let { h ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier.size(14.dp)
+                                            .background(habitDotColor(h.colorIndex), CircleShape)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(h.icon, fontSize = 16.sp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(h.name, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+}
+
+/** 单月日历网格：星期表头 + 日期格（带边框）+ 点击看明细。 */
+@Composable
+private fun MonthCalendar(
+    month: MonthModel,
+    data: Map<Long, Int>,
+    checkInsByDay: Map<Long, List<HabitCheckInEntity>>,
+    primary: Color,
+    surfaceVariant: Color,
+    outlineVariant: Color,
+    cellGap: Dp,
+    radius: Dp,
+    todayKey: Long,
+    weekLabels: List<String>,
+    onDayClick: (Long) -> Unit
+) {
+    val context = LocalContext.current
+    Column {
+        // 星期表头
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(cellGap)) {
+            weekLabels.forEach {
+                Text(
+                    it,
+                    Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(Modifier.height(cellGap))
+        // 日期网格
+        val total = month.firstDow + month.dayKeys.size
+        val rows = (total + 6) / 7
+        Column(verticalArrangement = Arrangement.spacedBy(cellGap)) {
+            repeat(rows) { r ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(cellGap)) {
+                    repeat(7) { c ->
+                        val pos = r * 7 + c
+                        if (pos < month.firstDow || pos >= month.firstDow + month.dayKeys.size) {
+                            Box(Modifier.weight(1f).aspectRatio(1f)) {}
+                        } else {
+                            val dayKey = month.dayKeys[pos - month.firstDow]
+                            val count = data[dayKey] ?: 0
+                            val future = dayKey > todayKey
+                            val isToday = dayKey == todayKey
+                            val hasCheckIn = checkInsByDay[dayKey]?.isNotEmpty() == true
+                            val level = when {
+                                future -> -1
+                                count <= 0 -> 0
+                                count == 1 -> 1
+                                count == 2 -> 2
+                                count == 3 -> 3
+                                else -> 4
+                            }
+                            Box(
+                                Modifier.weight(1f).aspectRatio(1f)
+                                    .clip(RoundedCornerShape(radius))
+                                    .background(heatColor(level, primary, surfaceVariant))
+                                    .border(1.dp, outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(radius))
+                                    .then(if (isToday) Modifier.border(1.5.dp, primary, RoundedCornerShape(radius)) else Modifier)
+                                    .clickable {
+                                        when {
+                                            future -> Toast.makeText(context, "未来日期", Toast.LENGTH_SHORT).show()
+                                            hasCheckIn -> onDayClick(dayKey)
+                                        }
+                                    }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 习惯图例：每个习惯一行色卡（专属色 + emoji + 名），直观对应打卡方格。 */
+@Composable
+private fun HabitLegend(habits: List<HabitEntity>) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            "习惯图例",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(6.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            habits.forEach { h ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(habitDotColor(h.colorIndex).copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Box(Modifier.size(12.dp).background(habitDotColor(h.colorIndex), CircleShape))
+                    Spacer(Modifier.width(6.dp))
+                    Text(h.icon, fontSize = 14.sp)
+                    Spacer(Modifier.width(4.dp))
+                    Text(h.name, style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
     }
 }

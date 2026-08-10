@@ -46,6 +46,8 @@ fun HabitScreen(nav: NavController) {
     val allCheckIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
     val heatRaw by Repo.habit.observeHeatmap().collectAsStateWithLifecycle(emptyList())
     val heatMap = remember(heatRaw) { heatRaw.associate { it.date to it.cnt } }
+    // 按天分组的打卡记录，用于热力图点击查看「当天打了哪些习惯」
+    val checkInsByDay = remember(allCheckIns) { allCheckIns.groupBy { it.date } }
     val today = TimeUtil.dayKey()
     // 每个习惯的打卡日期集合，用于连续天数与「今日是否已打卡」计算
     val byHabit = remember(allCheckIns) { allCheckIns.groupBy { it.habitId }.mapValues { m -> m.value.map { it.date }.toSet() } }
@@ -87,9 +89,11 @@ fun HabitScreen(nav: NavController) {
             }
             Spacer(Modifier.height(Dimen.s12))
             AppCard(Modifier.padding(horizontal = Dimen.s16)) {
-                Text("近一年打卡热力图", style = MaterialTheme.typography.titleMedium)
+                Text("打卡热力图", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(2.dp))
+                Text("上下滑动或点箭头切换月份", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(Dimen.s8))
-                HabitHeatmap(heatMap)
+                HabitHeatmap(heatMap, habits = habits, checkInsByDay = checkInsByDay)
             }
             Spacer(Modifier.height(Dimen.s12))
             SectionTitle("  我的习惯")
