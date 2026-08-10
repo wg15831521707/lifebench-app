@@ -71,6 +71,8 @@ fun FocusScreen(nav: NavController) {
     var noise by remember { mutableStateOf(whiteNoiseSetting) }
     var showSetting by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
+    // 今日累计专注分钟（Flow 实时刷新，复用既有 focusMinutesBetweenFlow）
+    val todayFocusMin by Repo.focus.focusMinutesBetweenFlow(TimeUtil.dayKey(), System.currentTimeMillis()).collectAsStateWithLifecycle(0)
 
     // 计时循环：仅在 running 为 true 时运行；暂停即取消，恢复即重启（从当前 remaining 继续）
     LaunchedEffect(running) {
@@ -149,6 +151,28 @@ fun FocusScreen(nav: NavController) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("专注 ${focusMin}分 · 休息 ${breakMin}分 · ${totalCycles} 轮", modifier = Modifier.weight(1f))
                 TextButton(onClick = { showSetting = true }) { Text("设置") }
+            }
+        }
+        Spacer(Modifier.height(Dimen.s12))
+        // 今日专注小结：复用既有 RingProgress，展示今日累计与本轮完成轮数
+        AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+            Text("今日专注小结", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(Dimen.s8))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RingProgress(
+                    progress = (todayFocusMin / 120f).coerceIn(0f, 1f),
+                    modifier = Modifier.size(64.dp),
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Text("$todayFocusMin\n分", fontSize = 11.sp, textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Spacer(Modifier.width(Dimen.s12))
+                Column {
+                    Text("今日累计专注 $todayFocusMin 分钟", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(Dimen.s2))
+                    Text("本次已完成 $cyclesDone 轮 · 目标 120 分", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         Spacer(Modifier.height(Dimen.s24))

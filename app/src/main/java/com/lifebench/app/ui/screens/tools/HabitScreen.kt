@@ -70,6 +70,22 @@ fun HabitScreen(nav: NavController) {
                 }
             }
             Spacer(Modifier.height(Dimen.s12))
+            // 最长连续纪录 + 本周完成率（近 7 天有打卡的天数 / 7）
+            val allDates = allCheckIns.map { it.date }.toSet()
+            val longestStreak = remember(allCheckIns) { computeLongestStreak(allDates) }
+            val weekDates = (0..6).map { TimeUtil.dayKey() - it * 86_400_000L }.toSet()
+            val activeDays = allDates.count { it in weekDates }
+            Row(Modifier.padding(horizontal = Dimen.s16)) {
+                AppCard(Modifier.weight(1f).padding(end = Dimen.s6)) {
+                    MetricLine(icon = Icons.Filled.EmojiEvents, label = "最长连续", value = "$longestStreak 天",
+                        valueColor = MaterialTheme.colorScheme.primary)
+                }
+                AppCard(Modifier.weight(1f).padding(start = Dimen.s6)) {
+                    MetricLine(icon = Icons.Filled.CalendarMonth, label = "本周打卡", value = "$activeDays / 7 天",
+                        valueColor = LocalExtraColors.current.success)
+                }
+            }
+            Spacer(Modifier.height(Dimen.s12))
             AppCard(Modifier.padding(horizontal = Dimen.s16)) {
                 Text("近一年打卡热力图", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(Dimen.s8))
@@ -177,6 +193,22 @@ private fun computeStreak(dates: Set<Long>): Int {
         cursor = TimeUtil.dayKey(cursor - 86_400_000L)
     }
     return streak
+}
+
+/** 计算全局最长连续打卡天数：对去重后的日期升序，相邻差 86400000ms 即连续 +1，断档则重置。 */
+private fun computeLongestStreak(dates: Set<Long>): Int {
+    if (dates.isEmpty()) return 0
+    val sorted = dates.sorted()
+    var best = 1
+    var cur = 1
+    for (i in 1 until sorted.size) {
+        when (val diff = sorted[i] - sorted[i - 1]) {
+            86_400_000L -> { cur++; if (cur > best) best = cur }
+            in 86_400_000L + 1..Long.MAX_VALUE -> cur = 1
+            // 同日重复（已 toSet 去重，不会出现）
+        }
+    }
+    return best
 }
 
 /** 连续天数里程碑：7→30→100→365，给人「下一目标」的节奏感（与首页一致）。 */

@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
@@ -132,8 +133,17 @@ fun FocusHubScreen(nav: NavController) {
     val diets by Repo.diet.observeByDate(TimeUtil.dayKey()).collectAsStateWithLifecycle(emptyList())
     val habits by Repo.habit.observeActiveHabits().collectAsStateWithLifecycle(emptyList())
     val checkIns by Repo.habit.observeAllCheckIns().collectAsStateWithLifecycle(emptyList())
+    val allSessions by Repo.focus.observeAll().collectAsStateWithLifecycle(emptyList())
     val todayKey = TimeUtil.dayKey()
     val todayChecked = checkIns.count { it.date == todayKey }
+    // 近 7 天每日专注分钟（UI 层聚合；个人数据量小，无需新增 Dao 查询）
+    val weeklyFocus = remember(allSessions) {
+        (6 downTo 0).map { off ->
+            val d = todayKey - off * 86_400_000L
+            allSessions.filter { it.type == "专注" && TimeUtil.dayKey(it.startTime) == d }
+                .sumOf { it.plannedMin.toLong() }.toFloat()
+        }
+    }
     LaunchedEffect(Unit) {
         focusMin = Repo.focus.focusMinutesBetween(TimeUtil.dayKey(), System.currentTimeMillis())
     }
@@ -160,6 +170,47 @@ fun FocusHubScreen(nav: NavController) {
                     Text("$focusMin", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.alignByBaseline())
                     Text(" 分钟", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f), modifier = Modifier.alignByBaseline())
                     Text(" · 目标 120", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.alignByBaseline())
+                }
+            }
+        }
+        // —— 近 7 天专注趋势（复用既有 LineChart，带 120 分钟目标基准线）——
+        items(1, span = { GridItemSpan(2) }) {
+            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+                Text("近 7 天专注趋势", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(Dimen.s8))
+                if (weeklyFocus.all { it == 0f }) {
+                    EmptyState("还没有专注记录，去专注一次吧")
+                } else {
+                    LineChart(values = weeklyFocus, color = MaterialTheme.colorScheme.primary, target = 120f, targetLabel = "目标 120")
+                    Spacer(Modifier.height(Dimen.s4))
+                    val weekdayNames = listOf("日", "一", "二", "三", "四", "五", "六")
+                    val todayWd = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        (0..6).forEach { i ->
+                            Text(weekdayNames[(todayWd - 6 + i + 7) % 7], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+        // —— 今日专注目标达成率环 ——
+        items(1, span = { GridItemSpan(2) }) {
+            AppCard(Modifier.padding(horizontal = Dimen.s16)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RingProgress(
+                        progress = (focusMin / 120f).coerceIn(0f, 1f),
+                        modifier = Modifier.size(64.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Text("${focusMin}\n/120", fontSize = 11.sp, textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Spacer(Modifier.width(Dimen.s12))
+                    Column {
+                        Text("今日专注目标达成", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(Dimen.s2))
+                        Text("目标 120 分钟 · 已完成 $focusMin 分钟", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
